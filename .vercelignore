@@ -5,3 +5,4 @@ server/firebase-key.json
 **/node_modules
 esatic/dist
 esatic/public/runtimes/vendor
+esatic/public/drawio

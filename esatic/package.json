@@ -4,9 +4,9 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "predev": "node scripts/copy-runtimes.mjs",
+    "predev": "node scripts/copy-runtimes.mjs && node scripts/copy-drawio.mjs",
     "dev": "node scripts/dev.mjs",
-    "prebuild": "node scripts/copy-runtimes.mjs",
+    "prebuild": "node scripts/copy-runtimes.mjs && node scripts/copy-drawio.mjs",
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
@@ -36,6 +36,7 @@
     "eslint": "^10.2.1",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.2",
+    "fflate": "^0.8.3",
     "globals": "^17.5.0",
     "vite": "^8.0.10"
   }

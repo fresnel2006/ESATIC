@@ -11,6 +11,8 @@ node_modules
 dist
 # Moteurs d'exécution copiés depuis node_modules par scripts/copy-runtimes.mjs
 public/runtimes/vendor
+# Éditeur de diagrammes draw.io copié par scripts/copy-drawio.mjs
+public/drawio
 dist-ssr
 *.local
 

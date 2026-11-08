@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Check, ChevronLeft, ChevronRight, Library, Plus, Save, Send, ListChecks, AlignLeft, Code2, Database, LayoutTemplate, FolderPlus, ArrowUp, ArrowDown, Trash2 } from 'lucide-react'
+import { Check, ChevronLeft, ChevronRight, Library, Plus, Save, Send, ListChecks, AlignLeft, Code2, Database, LayoutTemplate, Workflow, FolderPlus, ArrowUp, ArrowDown, Trash2 } from 'lucide-react'
 import * as api from '../../api/index.js'
 import { useToast } from '../../context/ToastContext.jsx'
 import QuestionEditor, { newQuestion, tempId } from '../../components/QuestionEditor.jsx'
@@ -10,7 +10,7 @@ import { fmtDateTime, fromLocalInput, toLocalInput, QUESTION_TYPES, LANGUAGES, L
 
 const STEPS = ['Informations', 'Dates et durée', 'Questions', 'Sécurité', 'Aperçu et publication']
 const TYPE_BUTTONS = [
-  ['qcm', ListChecks], ['ouverte', AlignLeft], ['code', Code2], ['sql', Database], ['html', LayoutTemplate],
+  ['qcm', ListChecks], ['ouverte', AlignLeft], ['code', Code2], ['sql', Database], ['html', LayoutTemplate], ['diagram', Workflow],
 ]
 
 // Identifiant d'un nouvel exercice

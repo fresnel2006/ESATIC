@@ -53,7 +53,7 @@ async function handleStatic(req, res, pathname) {
     const data = await readFile(file)
     const immutable = pathname.startsWith('/assets/')
     // Moteurs d'exécution (Python, C, SQL) : gros fichiers qui ne changent qu'avec une mise à jour, gardés 7 jours
-    const vendor = pathname.startsWith('/runtimes/vendor/')
+    const vendor = pathname.startsWith('/runtimes/vendor/') || pathname.startsWith('/drawio/')
     res.writeHead(200, {
       'Content-Type': TYPES[extname(file)] || 'application/octet-stream',
       // Taille annoncée : la page affiche « x Mo sur y Mo » pendant le téléchargement

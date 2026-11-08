@@ -174,7 +174,16 @@ export function buildExtraExams() {
     ],
   })
 
-  const codes = { 10: 'PYTP10', 11: 'JSEX11', 12: 'ALGO12', 13: 'SQL013', 14: 'CJAV14', 15: 'WEB015', 16: 'PHP016', 17: 'OCA017' }
+  exams.push({
+    id: 18, matiereId: 2, title: 'TP noté - Modélisation Merise et UML', durationMin: 90,
+    description: "Diagrammes réalisés dans l'éditeur de la plateforme et corrigés par l'enseignant.",
+    questions: [
+      q('diagram', 'Merise : une école gère des étudiants, des classes et des matières. Un étudiant appartient à une seule classe ; une classe compte au moins un étudiant. Un enseignant enseigne une ou plusieurs matières dans des classes. Réalisez le MCD avec les cardinalités.', 10, { notation: 'merise', starterXml: '', answerModelXml: '' }),
+      q('diagram', "UML : réalisez le diagramme de classes d'une bibliothèque (Livre, Exemplaire, Adhérent, Emprunt), avec les attributs principaux et les multiplicités.", 10, { notation: 'uml', starterXml: '', answerModelXml: '' }),
+    ],
+  })
+
+  const codes = { 10: 'PYTP10', 11: 'JSEX11', 12: 'ALGO12', 13: 'SQL013', 14: 'CJAV14', 15: 'WEB015', 16: 'PHP016', 17: 'OCA017', 18: 'MOD018' }
   const assessments = exams.map((e) => ({
     schoolId: 1, teacherId: 2, classeId: 1, kind: 'examen', status: 'publie',
     startAt: at(-1 * H), endAt: at(30 * D, 18, 0), maxAttempts: 1,

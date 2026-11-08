@@ -2,11 +2,13 @@
 import { lazy, Suspense } from 'react'
 import { Plus, Trash2, ArrowUp, ArrowDown, Copy, EyeOff, Eye } from 'lucide-react'
 import { ICON, Loader, Notice } from './ui.jsx'
-import { isWriteOnly, LANGUAGES, QUESTION_TYPES } from '../lib/format.js'
+import { isWriteOnly, DIAGRAM_NOTATIONS, LANGUAGES, QUESTION_TYPES } from '../lib/format.js'
+import { isEmptyDiagram } from './DiagramEditor.jsx'
 import { useExecution } from '../lib/useExecution.js'
 import SqlTestDatabase from './SqlTestDatabase.jsx'
 
 const CodeEditor = lazy(() => import('./CodeEditor.jsx'))
+const DiagramEditor = lazy(() => import('./DiagramEditor.jsx'))
 const WebEditor = lazy(() => import('./WebPlayground.jsx').then((m) => ({ default: m.WebEditor })))
 
 let tmp = -1
@@ -31,6 +33,10 @@ function baseQuestion(type) {
     base.data = { language: 'python', starter: '', timeLimitMs: 2000, tests: [{ id: rid(), name: 'Exemple', stdin: '', expected: '', points: 4, hidden: false }] }
   }
   if (type === 'sql') { base.points = 4; base.data = { schemaSql: '', seedSql: '', expectedQuery: '', orderMatters: false } }
+  if (type === 'diagram') {
+    base.points = 6
+    base.data = { notation: 'merise', starterXml: '', answerModelXml: '' }
+  }
   if (type === 'html') {
     base.points = 6
     base.data = { starterHtml: '', starterCss: '', starterJs: '', criteria: [{ id: rid(), label: 'Structure HTML', points: 3 }, { id: rid(), label: 'Mise en forme CSS', points: 3 }] }
@@ -243,6 +249,30 @@ export default function QuestionEditor({ q, index, total, onChange, onRemove, on
               <input type="checkbox" checked={!!q.data.orderMatters} onChange={(e) => setData({ orderMatters: e.target.checked })} />
               L'ordre des lignes compte
             </label>
+          </div>
+        )}
+
+        {q.type === 'diagram' && (
+          <div className="stack-sm">
+            <Field label="Formes proposées à l'étudiant" hint="L'étudiant peut toujours ajouter d'autres formes. Les cardinalités (0,1, 1,1, 0,n, 1,n) s'écrivent sur les liens.">
+              <select className="select" value={q.data.notation || 'libre'} onChange={(e) => setData({ notation: e.target.value })} style={{ maxWidth: 320 }}>
+                {Object.entries(DIAGRAM_NOTATIONS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+              </select>
+            </Field>
+            <details className="diagram-details">
+              <summary>Diagramme de départ donné à l'étudiant (facultatif){isEmptyDiagram(q.data.starterXml) ? '' : ' : rempli'}</summary>
+              <span className="hint">Par exemple quelques entités déjà placées, à compléter. Laissez vide pour une page blanche.</span>
+              <Suspense fallback={<Loader label="Chargement de l'éditeur..." />}>
+                <DiagramEditor key={`s-${q.id}-${q.data.notation}`} value={q.data.starterXml} notation={q.data.notation} onChange={(xml) => setData({ starterXml: xml })} height={460} title="Diagramme de départ" />
+              </Suspense>
+            </details>
+            <details className="diagram-details">
+              <summary>Corrigé type, visible seulement par les correcteurs (facultatif){isEmptyDiagram(q.data.answerModelXml) ? '' : ' : rempli'}</summary>
+              <Suspense fallback={<Loader label="Chargement de l'éditeur..." />}>
+                <DiagramEditor key={`c-${q.id}-${q.data.notation}`} value={q.data.answerModelXml} notation={q.data.notation} onChange={(xml) => setData({ answerModelXml: xml })} height={460} title="Corrigé type" />
+              </Suspense>
+            </details>
+            <Notice>Correction à la main : l'enseignant voit le diagramme de chaque étudiant et, s'il est rempli, le corrigé type à côté.</Notice>
           </div>
         )}
 

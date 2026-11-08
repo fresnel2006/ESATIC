@@ -6,7 +6,7 @@
 
 import { buildSeed, hashPassword, DEFAULT_TOOLS, applyDemoSections, schoolStructure, STRUCTURE_VERSION } from './seed.js'
 import { buildExtraExams } from './seedExams.js'
-import { TOOLS, SQL_LIMITS, sqlSizeKb } from '../lib/format.js'
+import { TOOLS, SQL_LIMITS, sqlSizeKb, DIAGRAM_MAX_KB } from '../lib/format.js'
 import { TEST_MODE } from '../config.js'
 import { BROWSER_LANGS, runInBrowser, sameOutput } from '../lib/browserRunner.js'
 
@@ -718,6 +718,7 @@ function studentQuestion(q) {
   const data = { ...q.data }
   delete data.correct
   delete data.answerModel
+  delete data.answerModelXml
   delete data.expectedQuery
   delete data.criteria
   if (q.type === 'code') data.tests = (q.data.tests || []).filter((t) => !t.hidden).map(({ expected, ...t }) => ({ ...t, expected }))
@@ -798,6 +799,11 @@ function validateAssessment(a, publish) {
     const kb = sqlSizeKb(q.data?.schemaSql, q.data?.seedSql)
     sqlKb += kb
     if (kb > SQL_LIMITS.maxKb) throw new ApiError(`Question ${i + 1} : base de test trop volumineuse (${Math.round(kb)} Ko, maximum ${SQL_LIMITS.maxKb} Ko).`)
+  }
+  for (const [i, q] of (a.questions || []).entries()) {
+    if (q.type !== 'diagram') continue
+    const kb = (String(q.data?.starterXml || '').length + String(q.data?.answerModelXml || '').length) / 1024
+    if (kb > DIAGRAM_MAX_KB) throw new ApiError(`Question ${i + 1} : diagrammes trop volumineux (${Math.round(kb)} Ko, maximum ${DIAGRAM_MAX_KB} Ko).`)
   }
   if (sqlKb > SQL_LIMITS.maxTotalKb) throw new ApiError(`Bases de test SQL trop volumineuses pour une seule épreuve (${Math.round(sqlKb)} Ko au total, maximum ${SQL_LIMITS.maxTotalKb} Ko). Utilisez la même petite base pour plusieurs questions.`)
   if (publish) {
@@ -1261,6 +1267,9 @@ export async function saveAnswers(attemptId, changes) {
     if (!q) continue
     const prev = att.answers[qid]
     if (prev && JSON.stringify(prev.value) === JSON.stringify(value)) continue
+    if (q.type === 'diagram' && String(value || '').length / 1024 > DIAGRAM_MAX_KB) {
+      throw new ApiError(`Votre diagramme est trop volumineux (plus de ${DIAGRAM_MAX_KB} Ko). Retirez les images collées ou les éléments inutiles.`)
+    }
     att.answers[qid] = { ...(prev || {}), value, updatedAt: now(), autoScore: null, manualScore: null, feedback: '' }
     // Instantanés horodatés du code
     if (q.type === 'code' || q.type === 'sql' || q.type === 'html') {

@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+﻿import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
   Maximize, Check, CloudUpload, CloudOff, Loader2, Play, ChevronLeft, ChevronRight, Globe, ListChecks,
@@ -17,9 +17,11 @@ import { Loader, Modal, Notice, ErrorBox, ICON } from '../../components/ui.jsx'
 import { WebEditor, WebPreview, webValue } from '../../components/WebPlayground.jsx'
 import ExamOutline, { outlineOf } from '../../components/ExamOutline.jsx'
 import { useExamGuard } from '../../lib/useExamGuard.js'
-import { fmtDuration, fmtRelativeDay, fmtTime, isWriteOnly, LANGUAGES, LANG_ENV, QUESTION_TYPES } from '../../lib/format.js'
+import { fmtDuration, fmtRelativeDay, fmtTime, isWriteOnly, DIAGRAM_NOTATIONS, LANGUAGES, LANG_ENV, QUESTION_TYPES } from '../../lib/format.js'
 
-const DESKTOP_ONLY = ['code', 'sql', 'html']
+const DiagramEditor = lazy(() => import('../../components/DiagramEditor.jsx'))
+
+const DESKTOP_ONLY = ['code', 'sql', 'html', 'diagram']
 
 function isAnswered(v) {
   if (v === null || v === undefined) return false
@@ -222,6 +224,22 @@ function QuestionBody({ q, value, onChange, onBigInsert, desktop }) {
   if (q.type === 'code') return <CodeQuestion q={q} value={value} onChange={onChange} onBigInsert={onBigInsert} />
   if (q.type === 'sql') return <SqlQuestion q={q} value={value} onChange={onChange} onBigInsert={onBigInsert} />
   if (q.type === 'html') return <HtmlQuestion q={q} value={value} onChange={onChange} onBigInsert={onBigInsert} />
+  if (q.type === 'diagram') {
+    return (
+      <div className="stack-sm">
+        <div className="engine-line no-run diagram-help">
+          <Info size={14} />
+          <span>
+            Glissez les formes depuis le panneau de gauche ({DIAGRAM_NOTATIONS[q.data.notation] || 'UML et Merise'}). Reliez deux formes en tirant une flèche depuis le bord de l'une vers l'autre.
+            Double-cliquez sur un lien pour écrire sa cardinalité (0,1, 1,1, 0,n, 1,n), ou sur une forme pour changer son texte. Votre diagramme est enregistré automatiquement.
+          </span>
+        </div>
+        <Suspense fallback={<Loader label="Ouverture de l'éditeur de diagrammes..." />}>
+          <DiagramEditor key={q.id} value={value || q.data.starterXml || ''} notation={q.data.notation} onChange={onChange} height={600} />
+        </Suspense>
+      </div>
+    )
+  }
   return null
 }
 

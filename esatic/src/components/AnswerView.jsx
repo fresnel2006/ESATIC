@@ -2,6 +2,7 @@
 import { Check, X } from 'lucide-react'
 import { LANGUAGES } from '../lib/format.js'
 import { WebEditor, webValue } from './WebPlayground.jsx'
+import { DiagramView } from './DiagramEditor.jsx'
 
 export function AnswerView({ question: q, value, showCorrect = false }) {
   if (value === null || value === undefined || value === '' || (Array.isArray(value) && !value.length)) {
@@ -35,6 +36,7 @@ export function AnswerView({ question: q, value, showCorrect = false }) {
       </div>
     )
   }
+  if (q.type === 'diagram') return <DiagramView value={value} height={460} />
   if (q.type === 'html') {
     // Code de l'étudiant à gauche, rendu en direct à droite (le correcteur peut cliquer dans la page)
     return <WebEditor value={webValue(value)} readOnly height={400} />

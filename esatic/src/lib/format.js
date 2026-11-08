@@ -96,7 +96,17 @@ export const QUESTION_TYPES = {
   code: 'Code',
   sql: 'SQL',
   html: 'Page web (HTML, CSS, JS)',
+  diagram: 'Modélisation (UML, Merise)',
 }
+
+// Questions de modélisation : bibliothèques de formes proposées à l'étudiant
+export const DIAGRAM_NOTATIONS = {
+  merise: 'Merise (MCD, MLD)',
+  uml: 'UML',
+  libre: 'UML et Merise',
+}
+// Taille maximale d'un diagramme (XML draw.io), pour garder les copies légères
+export const DIAGRAM_MAX_KB = 300
 
 export const LANGUAGES = {
   c: 'C',

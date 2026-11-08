@@ -881,3 +881,12 @@ h2, h3 { font-weight: 600; }
 .assign-level-head { text-align: left; border: 0; background: transparent; font-weight: 700; cursor: pointer; padding: 0 0 2px; color: var(--text); }
 .assign-level-head .muted { font-weight: 400; font-size: 0.75rem; margin-left: 4px; }
 @media (max-width: 760px) { .assign-levels { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* Questions de modélisation (UML, Merise) : éditeur draw.io */
+.diagram-editor { position: relative; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; background: #fff; }
+.diagram-editor iframe { width: 100%; height: 100%; border: 0; display: block; }
+.diagram-loading { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: 8px; color: var(--text-2); font-size: 0.9rem; }
+.diagram-details { border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; }
+.diagram-details summary { cursor: pointer; font-weight: 500; font-size: 0.9rem; }
+.diagram-details[open] summary { margin-bottom: 8px; }
+.diagram-help { border: 1px solid var(--border); border-radius: 8px; }

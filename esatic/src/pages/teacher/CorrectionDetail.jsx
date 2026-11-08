@@ -1,10 +1,11 @@
-﻿import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, ChevronLeft, ChevronRight, Save, Zap, Loader2 } from 'lucide-react'
 import { TestResults, FeedbackField, useComments } from '../../components/grading.jsx'
 import * as api from '../../api/index.js'
 import { useToast } from '../../context/ToastContext.jsx'
 import { AnswerView } from '../../components/AnswerView.jsx'
+import { DiagramView, isEmptyDiagram } from '../../components/DiagramEditor.jsx'
 import Statement from '../../components/Statement.jsx'
 import { ErrorBox, Loader, Notice, RiskBadge, StatusBadge, ICON } from '../../components/ui.jsx'
 import { EVENT_LABELS, QUESTION_TYPES, fmtDateTime, fmtTime, fmtNote } from '../../lib/format.js'
@@ -18,6 +19,7 @@ function Corrige({ q }) {
     </div>
   )
   if (q.type === 'sql') return <pre className="code-block">{q.data.expectedQuery}</pre>
+  if (q.type === 'diagram') return isEmptyDiagram(q.data.answerModelXml) ? <span className="small muted">Pas de corrigé type.</span> : <DiagramView value={q.data.answerModelXml} height={380} />
   if (q.type === 'html') return <div className="small">Grille : {q.data.criteria.map((c) => `${c.label} (${c.points})`).join(', ')}</div>
   return null
 }
