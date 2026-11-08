@@ -21,7 +21,7 @@ export const NAV = {
     { to: '/enseignant/banque', label: 'Banque de questions', icon: Library },
     { to: '/enseignant/corrections', label: 'Corrections', icon: ClipboardCheck, mobile: true },
     { to: '/enseignant/resultats', label: 'Résultats', icon: ChartColumn, mobile: true },
-    { to: '/enseignant/classes', label: 'Mes classes', icon: Users },
+    { to: '/enseignant/classes', label: 'Classes', icon: Users },
   ],
   proctor: [
     { to: '/surveillant/sessions', label: 'Sessions', icon: MonitorPlay, mobile: true },

@@ -10,19 +10,30 @@ export default function TeacherClasses() {
   const { data, loading, error } = useAsync(() => api.teacherClasses(), [])
   const [selected, setSelected] = useState(null)
   const [annonce, setAnnonce] = useState(null)
+  const [level, setLevel] = useState(null)
   const classes = data || []
-  const current = classes.find((c) => c.id === selected) || classes[0]
+  // Filtres : « Mes classes » (affectations de l'administration) puis chaque niveau, de la L1 au M2
+  const hasMine = classes.some((c) => c.mine)
+  const filters = [...(hasMine ? [{ value: 'mine', label: 'Mes classes' }] : []), ...[...new Set(classes.map((c) => c.level || 'Autres'))].map((l) => ({ value: l, label: l }))]
+  const filter = level ?? filters[0]?.value
+  const shown = classes.filter((c) => (filter === 'mine' ? c.mine : (c.level || 'Autres') === filter))
+  const current = shown.find((c) => c.id === selected) || shown[0]
 
   return (
     <div>
-      <PageHead title="Mes classes" subtitle="Classes et matières qui vous sont attribuées" actions={current && (
+      <PageHead title="Classes" subtitle="Toutes les classes de l'école, de la L1 au M2" actions={current && (
         <button className="btn btn-secondary" onClick={() => setAnnonce({ title: '', body: '', classeId: current.id })}><Megaphone {...ICON} /> Annonce à la classe</button>
       )} />
       <ErrorBox error={error} />
-      {loading && !data ? <Loader /> : classes.length === 0 ? <div className="card"><Empty icon={Users} title="Aucune classe attribuée">L'administration vous attribue vos classes et matières.</Empty></div> : (
+      {loading && !data ? <Loader /> : classes.length === 0 ? <div className="card"><Empty icon={Users} title="Aucune classe">L'administration crée les classes dans Structure.</Empty></div> : (
         <div className="stack">
           <div className="pills">
-            {classes.map((c) => (
+            {filters.map((f) => (
+              <button key={f.value} className={`pill ${filter === f.value ? 'active' : ''}`} onClick={() => { setLevel(f.value); setSelected(null) }}>{f.label}</button>
+            ))}
+          </div>
+          <div className="pills">
+            {shown.map((c) => (
               <button key={c.id} className={`pill ${current?.id === c.id ? 'active' : ''}`} onClick={() => setSelected(c.id)}>{c.name}</button>
             ))}
           </div>

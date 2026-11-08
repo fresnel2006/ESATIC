@@ -111,7 +111,10 @@ export default function EpreuveWizard() {
 
   const set = (patch) => setA((x) => ({ ...x, ...patch }))
   const setSec = (patch) => setA((x) => ({ ...x, security: { ...x.security, ...patch } }))
-  const matieresForClass = teaching.matieres.filter((m) => !a.classeId || teaching.rows.some((r) => r.classeId === Number(a.classeId) && r.matiereId === m.id))
+  // Toutes les matières ; celles que l'enseignant a dans cette classe (puis ailleurs) en premier
+  const rank = (m) => (teaching.rows.some((r) => r.classeId === Number(a.classeId) && r.matiereId === m.id) ? 0 : teaching.rows.some((r) => r.matiereId === m.id) ? 1 : 2)
+  const matieresForClass = [...teaching.matieres].sort((x, y) => rank(x) - rank(y) || x.name.localeCompare(y.name))
+  const levels = [...new Set(teaching.classes.map((c) => c.level || 'Autres'))]
   const total = a.questions.reduce((s, q) => s + Number(q.points || 0), 0)
   const locked = a.status === 'publie' && a.submitted > 0
   // Outils informatiques prévus par l'administration pour la matière choisie
@@ -242,7 +245,11 @@ export default function EpreuveWizard() {
               <label htmlFor="w-classe">Classe</label>
               <select id="w-classe" className="select" value={a.classeId} onChange={(e) => set({ classeId: Number(e.target.value), matiereId: '' })} disabled={isPublished}>
                 <option value="">Choisir une classe</option>
-                {teaching.classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                {levels.map((l) => (
+                  <optgroup key={l} label={l}>
+                    {teaching.classes.filter((c) => (c.level || 'Autres') === l).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </optgroup>
+                ))}
               </select>
             </div>
             <div className="field">

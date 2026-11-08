@@ -726,14 +726,22 @@ export async function getAssessment(id) {
 }
 
 // Classes et matières que l'enseignant peut viser
+// Classes et matières proposées à l'enseignant : toutes celles de l'école (L1 à M2).
+// `rows` : ses affectations (données par l'administration), pour mettre ses matières en premier.
+const LEVEL_ORDER = ['L1', 'L2', 'L3', 'M1', 'M2']
+const byLevel = (a, b) => {
+  const la = LEVEL_ORDER.indexOf(a.level); const lb = LEVEL_ORDER.indexOf(b.level)
+  return (la < 0 ? 99 : la) - (lb < 0 ? 99 : lb) || a.name.localeCompare(b.name)
+}
+
 export async function myTeaching() {
   await load()
   const user = requireUser('teacher')
   const rows = db.teaching.filter((t) => t.teacherId === user.id)
   return {
     rows: clone(rows),
-    classes: db.classes.filter((c) => rows.some((r) => r.classeId === c.id)),
-    matieres: db.matieres.filter((m) => rows.some((r) => r.matiereId === m.id)),
+    classes: clone([...db.classes].sort(byLevel)),
+    matieres: clone(db.matieres),
   }
 }
 
@@ -815,8 +823,9 @@ export async function saveAssessment(input, publish = false) {
   await load()
   const user = requireUser('teacher')
   const a = clone(input)
-  if (!db.teaching.some((t) => t.teacherId === user.id && t.classeId === Number(a.classeId) && t.matiereId === Number(a.matiereId))) {
-    throw new ApiError('Vous n\'enseignez pas cette matière dans cette classe.')
+  // Toutes les classes et matières de l'école sont ouvertes aux enseignants
+  if (!db.classes.some((c) => c.id === Number(a.classeId)) || !db.matieres.some((m) => m.id === Number(a.matiereId))) {
+    throw new ApiError('Choisissez une classe et une matière.')
   }
   a.sections = cleanSections(a)
   validateAssessment(a, publish)
@@ -1718,20 +1727,18 @@ export async function assessmentResults(assessmentId) {
 }
 
 // GET /api/teacher/classes
+// Toutes les classes de l'école (L1 à M2) ; `mine` : classes où l'enseignant a une affectation
 export async function teacherClasses() {
   await load()
   const user = requireUser('teacher')
   const rows = db.teaching.filter((t) => t.teacherId === user.id)
-  const classIds = [...new Set(rows.map((r) => r.classeId))]
-  return classIds.map((cid) => {
-    const c = db.classes.find((x) => x.id === cid)
-    return {
-      ...c,
-      filiere: db.filieres.find((f) => f.id === c.filiereId)?.name ?? '',
-      matieres: rows.filter((r) => r.classeId === cid).map((r) => db.matieres.find((m) => m.id === r.matiereId)?.name),
-      students: db.users.filter((u) => u.role === 'student' && u.classeId === cid).map(publicUser).sort((x, y) => x.lastName.localeCompare(y.lastName)),
-    }
-  })
+  return [...db.classes].sort(byLevel).map((c) => ({
+    ...c,
+    mine: rows.some((r) => r.classeId === c.id),
+    filiere: db.filieres.find((f) => f.id === c.filiereId)?.name ?? '',
+    matieres: rows.filter((r) => r.classeId === c.id).map((r) => db.matieres.find((m) => m.id === r.matiereId)?.name).filter(Boolean),
+    students: db.users.filter((u) => u.role === 'student' && u.classeId === c.id && u.active).map(publicUser).sort((x, y) => x.lastName.localeCompare(y.lastName)),
+  }))
 }
 
 // ---------------------------------------------------------------------------
