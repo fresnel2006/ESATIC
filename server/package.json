@@ -1,0 +1,17 @@
+{
+  "name": "esatic-server",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "node --env-file=.env --watch-path=src --watch-path=../esatic/src/api src/server.js",
+    "start": "node --env-file=.env src/server.js",
+    "check": "node --env-file=.env scripts/check.js",
+    "seed": "node --env-file=.env scripts/seed.js",
+    "init-ecole": "node --env-file=.env scripts/init-ecole.js",
+    "vercel-env": "node --env-file=.env scripts/vercel-env.js"
+  },
+  "dependencies": {
+    "firebase-admin": "^14.5.0"
+  }
+}

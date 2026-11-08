@@ -1,0 +1,7 @@
+# Jamais envoyés à Vercel : secrets, dépendances (réinstallées par Vercel), site compilé (recompilé par Vercel)
+**/.env
+server/firebase-key.json
+**/*-firebase-adminsdk-*.json
+**/node_modules
+esatic/dist
+esatic/public/runtimes/vendor
