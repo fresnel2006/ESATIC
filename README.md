@@ -45,7 +45,7 @@ Pour repartir des données d'origine : Administrateur > Paramètres > Réinitial
 Réglages dans `src/config.js` (mettre `false` pour revenir au fonctionnement normal) :
 
 - `examsWithoutCode` : on entre dans n'importe quel examen avec le bouton « Commencer l'examen », sans code d'accès, sans attendre l'ouverture de la session, à toute heure et autant de fois que voulu. La durée compte à partir de l'entrée.
-- `runCodeInBrowser` : le bouton « Lancer » exécute vraiment **Python, JavaScript et SQL** dans le navigateur (Web Worker isolé, sans réseau ni accès aux fichiers, arrêté au temps limite). Chaque exemple visible est vérifié (réussi/échoué, attendu/obtenu), puis le programme tourne avec l'entrée saisie par l'étudiant. Ce résultat sert à essayer son code : la note reste calculée par le serveur de correction. **C, C++, Java et PHP** affichent un message clair : ils s'exécuteront dans le bac à sable Docker du serveur.
+- `runCodeInBrowser` : le bouton « Lancer » exécute vraiment **Python, JavaScript, PHP, SQL et C (de base)** dans le navigateur (Web Worker isolé, sans réseau ni accès aux fichiers, arrêté au temps limite). « Tester les exemples » vérifie les exemples de l'énoncé. **C++, Java, OCaml et le pseudo-code** s'écrivent sans s'exécuter : pas de bouton Lancer ni de terminal, un message calme l'explique, et l'enseignant corrige à la main.
 
 Les moteurs (Pyodide pour Python, sql.js pour SQL) sont copiés de `node_modules` vers `public/runtimes/vendor/` automatiquement avant `npm run dev` et `npm run build` (script `scripts/copy-runtimes.mjs`). Ils sont servis par le PC lui-même : pas d'internet nécessaire. Le premier lancement de Python prend quelques secondes (préchargé dès l'ouverture de la question).
 
@@ -112,7 +112,7 @@ L'administrateur règle, dans Structure > Matières, les outils de chaque matiè
 
 Ces fonctions dépendent du backend et sont signalées clairement dans l'interface :
 
-- **Correction automatique du code et du SQL** et **exécution de C, C++, Java, PHP** : dans un bac à sable isolé côté serveur (conteneur Docker sans réseau, avec limites de temps, de mémoire et de processus). En mode test, Python, JavaScript et SQL s'exécutent déjà dans le navigateur pour essayer son code, mais la note n'en dépend pas. En attendant, l'enseignant note le code à la main.
+- **Exécution de C++, Java et OCaml** : non disponible (aucun serveur d'exécution). Ces questions sont corrigées à la main par l'enseignant.
 - **Vérification Safe Exam Browser** (l'option existe dans l'assistant ; la clé est vérifiée par le serveur).
 - **Import Excel (.xlsx)** direct : pour l'instant, enregistrer le fichier Excel en CSV (séparateur point-virgule).
 - Sécurité réelle des comptes : dans la démo, les mots de passe sont hachés dans le navigateur, ce qui ne protège rien. Le serveur fera le hachage et le contrôle des droits.
@@ -161,7 +161,7 @@ esatic/
 ## Plan par phases
 
 - **Phase 1 - interface (faite)** : tout ce qui est listé plus haut, avec le serveur de démonstration.
-- **Phase 1 - serveur (prochaine étape)** : API (comptes, rôles, sessions, épreuves, copies, journal), base SQLite compatible PostgreSQL avec un identifiant d'école sur chaque table, bac à sable Docker pour C, C++, Python, Java, JavaScript et PHP, exécution SQL isolée, import Excel, vérification Safe Exam Browser.
+- **Phase 1 - serveur (prochaine étape)** : API (comptes, rôles, sessions, épreuves, copies, journal), base SQLite compatible PostgreSQL avec un identifiant d'école sur chaque table, import Excel, vérification Safe Exam Browser.
 - **Phase 2** : bulletins (fait côté interface : coefficients, périodes, modèle, PDF avec logo et code de vérification, historique des modifications), modélisation Merise/UML, tableau de bord surveillant enrichi, similarité entre copies, grilles de critères généralisées.
 - **Phase 3** : mode à distance (détection du regard en signalement uniquement), multi-écoles complet, super administrateur.
 

@@ -18,8 +18,6 @@ import StudentResultats from './pages/student/StudentResultats.jsx'
 import StudentResultDetail from './pages/student/StudentResultDetail.jsx'
 import StudentAnnonces from './pages/student/StudentAnnonces.jsx'
 import AssessmentDetail from './pages/student/AssessmentDetail.jsx'
-import StudentBulletin from './pages/student/StudentBulletin.jsx'
-import VerifyBulletin from './pages/VerifyBulletin.jsx'
 
 import TeacherHome from './pages/teacher/TeacherHome.jsx'
 import TeacherEpreuves from './pages/teacher/TeacherEpreuves.jsx'
@@ -39,7 +37,7 @@ import AdminDashboard from './pages/admin/AdminDashboard.jsx'
 import AdminUsers from './pages/admin/AdminUsers.jsx'
 import AdminStructure from './pages/admin/AdminStructure.jsx'
 import AdminEpreuves from './pages/admin/AdminEpreuves.jsx'
-import AdminBulletins from './pages/admin/AdminBulletins.jsx'
+import BulletinsDepot from './pages/BulletinsDepot.jsx'
 import AdminJournal from './pages/admin/AdminJournal.jsx'
 import AdminParametres from './pages/admin/AdminParametres.jsx'
 
@@ -72,8 +70,6 @@ export default function App() {
     <Routes>
       <Route path="/" element={<HomeRedirect />} />
       <Route path="/connexion" element={<Login />} />
-      <Route path="/verifier" element={<VerifyBulletin />} />
-      <Route path="/verifier/:code" element={<VerifyBulletin />} />
       <Route path="/premiere-connexion" element={<RequireAuth><ChangePassword firstLogin /></RequireAuth>} />
 
       {/* Composition : plein écran, sans la navigation */}
@@ -89,7 +85,6 @@ export default function App() {
         <Route path="/etudiant/resultats" element={<RequireAuth roles={['student']}><StudentResultats /></RequireAuth>} />
         <Route path="/etudiant/resultats/:attemptId" element={<RequireAuth roles={['student']}><StudentResultDetail /></RequireAuth>} />
         <Route path="/etudiant/annonces" element={<RequireAuth roles={['student']}><StudentAnnonces /></RequireAuth>} />
-        <Route path="/etudiant/bulletins/:id" element={<RequireAuth roles={['student']}><StudentBulletin /></RequireAuth>} />
         <Route path="/etudiant/epreuve/:id" element={<RequireAuth roles={['student']}><AssessmentDetail /></RequireAuth>} />
 
         <Route path="/enseignant" element={<RequireAuth roles={['teacher']}><TeacherHome /></RequireAuth>} />
@@ -112,9 +107,11 @@ export default function App() {
         <Route path="/admin/utilisateurs" element={<RequireAuth roles={['admin']}><AdminUsers /></RequireAuth>} />
         <Route path="/admin/structure" element={<RequireAuth roles={['admin']}><AdminStructure /></RequireAuth>} />
         <Route path="/admin/epreuves" element={<RequireAuth roles={['admin']}><AdminEpreuves /></RequireAuth>} />
-        <Route path="/admin/bulletins" element={<RequireAuth roles={['admin']}><AdminBulletins /></RequireAuth>} />
+        <Route path="/admin/bulletins" element={<RequireAuth roles={['admin']}><BulletinsDepot /></RequireAuth>} />
         <Route path="/admin/journal" element={<RequireAuth roles={['admin']}><AdminJournal /></RequireAuth>} />
         <Route path="/admin/parametres" element={<RequireAuth roles={['admin']}><AdminParametres /></RequireAuth>} />
+
+        <Route path="/educateur/bulletins" element={<RequireAuth roles={['educator']}><BulletinsDepot /></RequireAuth>} />
 
         <Route path="*" element={<NotFound />} />
       </Route>

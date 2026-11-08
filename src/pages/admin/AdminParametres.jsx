@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+﻿import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Save, RotateCcw } from 'lucide-react'
 import * as api from '../../api/index.js'
@@ -6,12 +6,29 @@ import { useToast } from '../../context/ToastContext.jsx'
 import { useAuth } from '../../context/AuthContext.jsx'
 import { Confirm, ErrorBox, Loader, Notice, PageHead, ResponsiveTable, StatusBadge, useAsync, ICON } from '../../components/ui.jsx'
 import { DEMO_TOOLS } from '../../config.js'
+import { LANGUAGES } from '../../lib/format.js'
+import { canRunLanguage } from '../../lib/useExecution.js'
 
 function Toggle({ title, desc, checked, onChange }) {
   return (
     <div className="toggle-row">
       <div><div className="t">{title}</div><div className="d">{desc}</div></div>
       <label className="switch"><input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} aria-label={title} /><span /></label>
+    </div>
+  )
+}
+
+// Exécution du code : dans le navigateur des étudiants uniquement
+function ExecutionCard() {
+  const run = Object.keys(LANGUAGES).filter(canRunLanguage).map((l) => LANGUAGES[l])
+  const write = Object.keys(LANGUAGES).filter((l) => !canRunLanguage(l)).map((l) => LANGUAGES[l])
+  return (
+    <div className="card">
+      <div className="card-header"><h2>Exécution du code</h2></div>
+      <div className="card-body stack-sm">
+        <p className="small"><b>Exécutés dans le navigateur de l'étudiant :</b> {[...run, 'SQL', 'Web (HTML, CSS, JS)'].join(', ')}. Rien à installer, le serveur n'est pas sollicité.</p>
+        <p className="small"><b>Écrits sans exécution :</b> {write.join(', ')}. L'étudiant écrit son code dans l'éditeur ; il est enregistré et l'enseignant le corrige à la main.</p>
+      </div>
     </div>
   )
 }
@@ -25,7 +42,7 @@ function ToolsCard() {
         <Link className="card-link" to="/admin/structure?onglet=matieres">Régler par matière</Link>
       </div>
       <div className="card-body stack">
-        <Notice>Rien n'est à installer sur les PC des étudiants : ils codent dans le navigateur. Les compilateurs et interpréteurs (Java, gcc...) seront installés une seule fois, dans le bac à sable du serveur de correction.</Notice>
+        <Notice>Rien n'est à installer, ni sur les PC des étudiants ni sur le serveur : tout se passe dans le navigateur.</Notice>
         <ErrorBox error={error} />
         {!data ? <Loader /> : (
           <ResponsiveTable
@@ -36,9 +53,9 @@ function ToolsCard() {
               { key: 'matieres', label: 'Matières', render: (t) => (t.matieres.length ? t.matieres.join(', ') : <span className="muted">Aucune</span>) },
               { key: 'assessmentCount', label: 'Épreuves', render: (t) => t.assessmentCount },
               { key: 'now', label: 'Exécution aujourd\'hui', render: (t) => (t.runsInBrowser
-                ? <StatusBadge status="rendu" label={t.key === 'html' ? 'Aperçu intégré' : 'Navigateur (mode test)'} />
-                : <StatusBadge status="a_faire" label="Attend le serveur" />) },
-              { key: 'server', label: 'À installer sur le serveur', render: (t) => <span className="small">{t.server}</span> },
+                ? <StatusBadge status="rendu" label={t.key === 'html' ? 'Aperçu intégré' : 'Exécuté dans le navigateur'} />
+                : <StatusBadge status="a_faire" label="Écrit, corrigé par l'enseignant" />) },
+              { key: 'server', label: 'Fonctionnement', render: (t) => <span className="small">{t.server}</span> },
             ]}
           />
         )}
@@ -88,11 +105,8 @@ export default function AdminParametres() {
         </div>
       </div></div>
 
+      <ExecutionCard />
       <ToolsCard />
-
-      <div className="card"><div className="card-header"><h2>Résultats</h2></div><div className="card-body">
-        <Toggle title="Afficher le rang dans les bulletins" desc="Les étudiants verront leur rang dans la classe (module bulletins, phase 2)." checked={!!st.showRank} onChange={(v) => set({ showRank: v })} />
-      </div></div>
 
       {DEMO_TOOLS && <div className="card"><div className="card-header"><h2>Démonstration</h2></div><div className="card-body row-wrap" style={{ justifyContent: 'space-between' }}>
         <p className="small muted" style={{ maxWidth: 520 }}>Efface toutes les données et revient aux données de démonstration d'origine.</p>

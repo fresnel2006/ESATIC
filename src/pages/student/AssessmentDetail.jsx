@@ -7,7 +7,20 @@ import { ExamCodeForm, useNow } from '../../components/student.jsx'
 import { fmtDateTime, fmtNote, TOOLS } from '../../lib/format.js'
 import { useToast } from '../../context/ToastContext.jsx'
 import { TEST_MODE } from '../../config.js'
-import { warmUp } from '../../lib/browserRunner.js'
+import { prepareEngine } from '../../lib/engines.js'
+import EngineStatus from '../../components/EngineStatus.jsx'
+import { useExecution } from '../../lib/useExecution.js'
+
+// Langages de l'épreuve : ceux qu'on peut lancer, et ceux qu'on écrit seulement (corrigés par l'enseignant)
+function languageRule(languages, execution) {
+  const name = (l) => TOOLS[l]?.label ?? l
+  const list = languages.map(name).join(', ')
+  const noRun = execution.known ? languages.filter((l) => !execution.canRun(l)) : []
+  if (!noRun.length) return `Langage : ${list}. L'éditeur et le terminal sont prêts, rien à installer.`
+  const words = noRun.map(name).join(', ')
+  if (noRun.length === languages.length) return `Langage : ${list}. Vous écrivez votre code dans l'éditeur ; son exécution n'est pas disponible sur la plateforme, l'enseignant le corrigera.`
+  return `Langage : ${list}. L'éditeur et le terminal sont prêts. Pour ${words}, l'exécution n'est pas disponible : écrivez votre code, l'enseignant le corrigera.`
+}
 
 export default function AssessmentDetail() {
   const { id } = useParams()
@@ -16,6 +29,7 @@ export default function AssessmentDetail() {
   const [busy, setBusy] = useState(false)
   const { data: a, loading, error } = useAsync(() => api.studentAssessment(id), [id])
   const t = useNow(60000)
+  const execution = useExecution()
   // Précharge la page de composition et l'éditeur de code pendant que l'étudiant lit les consignes
   useEffect(() => { import('./TakeAttempt.jsx') }, [])
   // Moteurs d'exécution des langages de l'épreuve (PHP : quelques Mo) téléchargés dès maintenant,
@@ -23,7 +37,7 @@ export default function AssessmentDetail() {
   const langs = (a?.languages || []).join(',')
   useEffect(() => {
     if (!langs || a?.status === 'annule') return
-    for (const l of langs.split(',')) warmUp(l)
+    for (const l of langs.split(',')) prepareEngine(l)
   }, [langs, a?.status])
 
   if (loading && !a) return <Loader />
@@ -48,7 +62,7 @@ export default function AssessmentDetail() {
   const rules = [
     [Clock, a.kind === 'examen' ? `Durée : ${a.durationMin} minutes, chronomètre visible pendant toute l'épreuve.` : `Date limite : ${fmtDateTime(a.endAt)}.`],
     [ListChecks, `${a.questionCount} question${a.questionCount > 1 ? 's' : ''}, ${a.maxPoints} points au total.`],
-    a.languages?.length > 0 && [FileCode2, `Langage : ${a.languages.map((l) => TOOLS[l]?.label ?? l).join(', ')}. L'éditeur et le terminal sont prêts, rien à installer.`],
+    a.languages?.length > 0 && [FileCode2, languageRule(a.languages, execution)],
     a.security.fullscreen && [Maximize, "L'épreuve se fait en plein écran. Une sortie du plein écran est enregistrée."],
     a.security.exitWarnings && [TriangleAlert, 'Si vous quittez l\'épreuve (plein écran ou changement de fenêtre), un avertissement s\'affiche. À la deuxième sortie, votre copie est envoyée automatiquement.'],
     a.security.blockPaste && [ClipboardX, "Le copier-coller depuis l'extérieur est bloqué. Dans l'éditeur, vous pouvez copier-coller votre propre code."],
@@ -94,6 +108,9 @@ export default function AssessmentDetail() {
               </div>
             ))}
           </div>
+          {TEST_MODE.runCodeInBrowser && a.languages?.length > 0 && (
+            <div className="card-body" style={{ paddingTop: 0 }}><EngineStatus languages={a.languages} showReady /></div>
+          )}
         </div>
       )}
 

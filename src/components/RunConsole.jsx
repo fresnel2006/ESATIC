@@ -25,19 +25,61 @@ function textTable({ columns, rows }) {
   return [line('┌', '┬', '┐'), row(cells[0]), line('├', '┼', '┤'), ...cells.slice(1).map(row), line('└', '┴', '┘')].join('\n')
 }
 
+// Valeur sur plusieurs lignes, alignée sous son intitulé
+function Value({ label, text, empty, err }) {
+  return (
+    <div className="t-field">
+      <span className="t-dim">{label}</span>
+      <pre className={`t-pre t-value ${err ? 't-err' : ''}`}>{text || <span className="t-dim">{empty}</span>}</pre>
+    </div>
+  )
+}
+
+// « Tester les exemples » : chaque exemple réussi ou non ; pour un échec, entrée, attendu et obtenu alignés
+function TestsBlock({ r, limit }) {
+  const results = r.results || []
+  const passed = results.filter((x) => x.passed).length
+  return (
+    <div className="t-block">
+      <Prompt command="tester-exemples" />
+      {results.map((t, i) => (
+        <div key={i}>
+          <div className="t-line">
+            {t.passed ? <span className="t-ok">[ OK  ]</span> : <span className="t-err">[ÉCHEC]</span>} {t.name}
+          </div>
+          {!t.passed && (
+            <div className="t-diff">
+              {t.timeout ? <div className="t-err">temps limite dépassé ({limit} s)</div> : (
+                <>
+                  <Value label="entrée" text={t.stdin.replace(/\n+$/, '')} empty="(vide)" />
+                  <Value label="attendu" text={String(t.expected ?? '').replace(/\n+$/, '')} empty="(rien)" />
+                  <Value label="obtenu" text={(t.stdout || '').replace(/\n+$/, '')} empty="(aucune sortie)" />
+                  {t.stderr && <Value label="erreur" text={t.stderr.trim()} err />}
+                </>
+              )}
+            </div>
+          )}
+        </div>
+      ))}
+      <div className={passed === results.length ? 't-ok' : 't-dim'}>{passed}/{results.length} exemple{results.length > 1 ? 's' : ''} réussi{passed > 1 ? 's' : ''}</div>
+    </div>
+  )
+}
+
 function RunBlock({ entry }) {
-  const { command, result: r, language } = entry
+  const { command, result: r, language, mode } = entry
   const limit = (r.timeLimitMs || 2000) / 1000
   if (r.available === false) {
     const tool = command.split(' ')[0]
     return (
       <div className="t-block">
         <Prompt command={command} />
-        <div className="t-dim">{tool} : exécution réservée au bac à sable du serveur de correction (Docker), pas encore branché.</div>
-        <div className="t-dim">Votre code est bien enregistré.</div>
+        <div className="t-dim">{tool} : l'exécution de ce langage n'est pas disponible sur la plateforme.</div>
+        <div className="t-dim">Votre code est bien enregistré ; l'enseignant le corrigera.</div>
       </div>
     )
   }
+  if (mode === 'tests') return <TestsBlock r={r} limit={limit} />
 
   if (language === 'sql') {
     return (
@@ -52,42 +94,18 @@ function RunBlock({ entry }) {
     )
   }
 
-  const results = r.results || []
-  const passed = results.filter((x) => x.passed).length
+  // « Lancer » : comme dans un vrai terminal, la commande puis ce que le programme affiche, rien d'autre
+  const transcript = r.transcript || []
   return (
     <div className="t-block">
       <Prompt command={command} />
-      <pre className="t-pre">
-        {(r.transcript || []).map((c, i) => <span key={i} className={c.k === 'in' ? 't-in' : c.k === 'err' ? 't-err' : undefined}>{c.s}</span>)}
-      </pre>
-      {r.timeout && <div className="t-err">^C Temps limite dépassé ({limit} s) : programme arrêté. Boucle infinie, ou programme en attente d'une entrée ?</div>}
-      <div className="t-dim">[code de sortie {r.exitCode ?? 0}{r.durationMs !== undefined && !r.timeout ? ` - ${r.durationMs} ms` : ''}]</div>
-
-      {results.length > 0 && (
-        <>
-          <Prompt command="verifier-exemples" />
-          {results.map((t, i) => (
-            <div key={i}>
-              <div className="t-line">
-                {t.passed ? <span className="t-ok">[ OK  ]</span> : <span className="t-err">[ÉCHEC]</span>} {t.name}
-              </div>
-              {!t.passed && (
-                <div className="t-diff">
-                  {t.timeout ? <div className="t-err">temps limite dépassé ({limit} s)</div> : (
-                    <>
-                      <div><span className="t-dim">entrée  :</span> {t.stdin.replace(/\n/g, ' / ') || '(vide)'}</div>
-                      <div><span className="t-dim">attendu :</span> {t.expected}</div>
-                      <div><span className="t-dim">obtenu  :</span> {t.stdout.trimEnd() || '(aucune sortie)'}</div>
-                      {t.stderr && <div className="t-err">{t.stderr.split('\n').slice(-1)[0]}</div>}
-                    </>
-                  )}
-                </div>
-              )}
-            </div>
-          ))}
-          <div className={passed === results.length ? 't-ok' : 't-dim'}>{passed}/{results.length} exemple{results.length > 1 ? 's' : ''} réussi{passed > 1 ? 's' : ''}</div>
-        </>
+      {transcript.length > 0 && (
+        <pre className="t-pre">
+          {transcript.map((c, i) => <span key={i} className={c.k === 'in' ? 't-in' : c.k === 'err' ? 't-err' : undefined}>{c.s}</span>)}
+        </pre>
       )}
+      {r.timeout && <div className="t-err">^C Temps limite dépassé ({limit} s) : programme arrêté. Boucle infinie, ou programme en attente d'une entrée ?</div>}
+      {!r.timeout && r.exitCode ? <div className="t-dim">[le programme s'est arrêté avec le code {r.exitCode}]</div> : null}
     </div>
   )
 }
@@ -106,17 +124,16 @@ export default function Terminal({ language, history, running, first, onClear })
         <span>Terminal</span>
         <span className="t-dim">- {env.file}</span>
         <div className="spacer" />
-        {history.some((h) => h.result?.browser) && <span className="t-dim small">mode test : exécuté dans le navigateur</span>}
         <button className="terminal-btn" onClick={onClear} disabled={!history.length || running} title="Effacer le terminal">
           <Eraser size={14} strokeWidth={1.6} /> Effacer
         </button>
       </div>
       <div className="terminal-body" ref={bodyRef} role="log" aria-live="polite">
-        {!history.length && !running && <div className="t-dim">{language === 'sql' ? `Cliquez sur « Exécuter » pour lancer la requête sur la base de test.` : `Cliquez sur « Lancer » pour exécuter ${env.file}. L'entrée du programme est celle saisie à gauche.`}</div>}
+        {!history.length && !running && <div className="t-dim">{language === 'sql' ? `Cliquez sur « Exécuter » pour lancer la requête sur la base de test.` : `Cliquez sur « Lancer » pour exécuter ${env.file} avec l'entrée saisie au-dessus, ou sur « Tester les exemples » pour vérifier votre programme.`}</div>}
         {history.map((h, i) => <RunBlock key={i} entry={h} />)}
         {running ? (
           <div className="t-block">
-            <Prompt command={env.run} />
+            <Prompt command={running === 'tests' ? 'tester-exemples' : env.run} />
             <div className="t-dim">{first ? 'Préparation du moteur d\'exécution (quelques secondes la première fois)...' : 'Exécution...'}</div>
           </div>
         ) : (

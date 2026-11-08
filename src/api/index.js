@@ -1,7 +1,7 @@
 ﻿// Point d'entrée des données pour toutes les pages.
 // Mode 'serveur' : chaque fonction appelle le serveur Node.js (POST /api/<nom>), qui applique les règles
 // et enregistre dans Firestore. Mode 'demo' : la même logique tourne dans le navigateur (core.js).
-// L'exécution du code des étudiants reste toujours dans le navigateur, dans un Web Worker isolé.
+// L'exécution du code des étudiants se fait toujours dans le navigateur, dans un Web Worker isolé.
 
 import * as core from './core.js'
 import { API_MODE } from '../config.js'
@@ -107,22 +107,18 @@ export const createAnnouncement = pick('createAnnouncement')
 export const listNotifications = pick('listNotifications')
 export const markNotificationsRead = pick('markNotificationsRead')
 export const search = pick('search')
-export const bulletinPreview = pick('bulletinPreview')
-export const publishBulletins = pick('publishBulletins')
-export const setBulletinAppreciation = pick('setBulletinAppreciation')
-export const getBulletin = pick('getBulletin')
+export const bulletinOptions = pick('bulletinOptions')
+export const listBulletins = pick('listBulletins')
+export const uploadBulletin = pick('uploadBulletin')
+export const deleteBulletin = pick('deleteBulletin')
+export const getBulletinFile = pick('getBulletinFile')
 export const studentBulletins = pick('studentBulletins')
-export const verifyBulletin = pick('verifyBulletin')
-export const listManualGrades = pick('listManualGrades')
-export const saveManualGrade = pick('saveManualGrade')
-export const deleteManualGrade = pick('deleteManualGrade')
-export const getBulletinTemplate = pick('getBulletinTemplate')
-export const saveBulletinTemplate = pick('saveBulletinTemplate')
 
-// Exécution du code : dans le navigateur, sans passer par le serveur
-export const runCode = REMOTE ? core.executeCode : core.runCode
+// Exécution du code : toujours dans le navigateur (Python, JavaScript, SQL, PHP, C de base).
+// Les autres langages reçoivent un message « exécution non disponible ».
+export const runCode = REMOTE ? (params) => core.executeCode(params) : core.runCode
 
-// Correction automatique : le serveur fournit les codes, le navigateur les exécute, le serveur note
+// Correction automatique : le serveur fournit les codes, le navigateur de l'enseignant les exécute, le serveur note
 const gradeApi = { autoGradeJobs: remote('autoGradeJobs'), applyAutoGrade: remote('applyAutoGrade') }
 export const autoGradeCopy = REMOTE ? (id) => core.autoGradeCopyWith(gradeApi, id) : core.autoGradeCopy
 export const autoGradeAll = REMOTE

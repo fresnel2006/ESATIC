@@ -1,8 +1,9 @@
 // Éditeur d'une question (assistant de création et banque de questions)
 import { lazy, Suspense } from 'react'
 import { Plus, Trash2, ArrowUp, ArrowDown, Copy, EyeOff, Eye } from 'lucide-react'
-import { ICON, Loader } from './ui.jsx'
-import { LANGUAGES, QUESTION_TYPES } from '../lib/format.js'
+import { ICON, Loader, Notice } from './ui.jsx'
+import { isWriteOnly, LANGUAGES, QUESTION_TYPES } from '../lib/format.js'
+import { useExecution } from '../lib/useExecution.js'
 import SqlTestDatabase from './SqlTestDatabase.jsx'
 
 const CodeEditor = lazy(() => import('./CodeEditor.jsx'))
@@ -52,6 +53,16 @@ public class Main {
 `,
   javascript: "const lignes = require('fs').readFileSync(0, 'utf8').split('\\n');\n",
   php: '<?php\n$ligne = trim(fgets(STDIN));\n',
+  ocaml: 'let () =\n  let ligne = read_line () in\n  print_endline ligne\n',
+  algo: `Algorithme NomDeLAlgorithme
+Variables
+    n : Entier
+Début
+    Écrire("Entrez un nombre : ")
+    Lire(n)
+
+Fin
+`,
 }
 
 function Field({ label, hint, children }) {
@@ -69,7 +80,11 @@ export default function QuestionEditor({ q, index, total, onChange, onRemove, on
   const langOptions = Object.entries(LANGUAGES).filter(([k]) => !languages || languages.includes(k) || k === q.data?.language)
   const set = (patch) => onChange({ ...q, ...patch })
   const setData = (patch) => onChange({ ...q, data: { ...q.data, ...patch } })
-  const testSum = q.type === 'code' ? (q.data.tests || []).reduce((s, t) => s + Number(t.points || 0), 0) : 0
+  // Langage exécutable dans le navigateur : tests automatiques. Sinon (C++, Java, OCaml, pseudo-code) :
+  // correction à la main, barème saisi directement
+  const execution = useExecution()
+  const autoTests = q.type === 'code' && (!execution.known || execution.canRun(q.data.language))
+  const testSum = autoTests ? (q.data.tests || []).reduce((s, t) => s + Number(t.points || 0), 0) : 0
   const critSum = q.type === 'html' ? (q.data.criteria || []).reduce((s, c) => s + Number(c.points || 0), 0) : 0
 
   return (
@@ -84,8 +99,8 @@ export default function QuestionEditor({ q, index, total, onChange, onRemove, on
             type="number" min="0.5" step="0.5" className="input" style={{ width: 80, minHeight: 32 }}
             value={q.points}
             onChange={(e) => set({ points: e.target.value === '' ? '' : Number(e.target.value) })}
-            disabled={q.type === 'code' || q.type === 'html'}
-            title={q.type === 'code' ? 'Somme des points des tests' : q.type === 'html' ? 'Somme des critères' : undefined}
+            disabled={autoTests || q.type === 'html'}
+            title={autoTests ? 'Somme des points des tests' : q.type === 'html' ? 'Somme des critères' : undefined}
           />
           pts
         </label>
@@ -154,10 +169,19 @@ export default function QuestionEditor({ q, index, total, onChange, onRemove, on
                   {langOptions.map(([k, v]) => <option key={k} value={k}>{v}{languages && !languages.includes(k) ? ' (non prévu pour la matière)' : ''}</option>)}
                 </select>
               </Field>
-              <Field label="Temps maximum par test (ms)">
-                <input type="number" min="200" max="10000" step="100" className="input" value={q.data.timeLimitMs} onChange={(e) => setData({ timeLimitMs: Number(e.target.value) })} />
-              </Field>
+              {autoTests && (
+                <Field label="Temps maximum par test (ms)">
+                  <input type="number" min="200" max="10000" step="100" className="input" value={q.data.timeLimitMs} onChange={(e) => setData({ timeLimitMs: Number(e.target.value) })} />
+                </Field>
+              )}
             </div>
+            {!autoTests && (
+              <Notice>
+                {isWriteOnly(q.data.language)
+                  ? 'Pseudo-code : l\'étudiant écrit son algorithme dans l\'éditeur, sans l\'exécuter. Vous le corrigez à la main ; fixez le barème en haut de la question.'
+                  : `L'exécution du ${LANGUAGES[q.data.language]} n'est pas disponible sur la plateforme : l'étudiant écrit son code sans pouvoir le lancer, et vous le corrigez à la main. Fixez le barème en haut de la question.`}
+              </Notice>
+            )}
             <Field label="Code de départ donné à l'étudiant">
               <div className="code-area">
                 <Suspense fallback={<Loader label="Chargement de l'éditeur..." />}>
@@ -165,7 +189,7 @@ export default function QuestionEditor({ q, index, total, onChange, onRemove, on
                 </Suspense>
               </div>
             </Field>
-            <div className="stack-sm">
+            {autoTests && <div className="stack-sm">
               <div className="row">
                 <span className="label">Tests automatiques</span>
                 <div className="spacer" />
@@ -199,7 +223,7 @@ export default function QuestionEditor({ q, index, total, onChange, onRemove, on
                   onChange({ ...q, points: tests.reduce((s, x) => s + Number(x.points || 0), 0), data: { ...q.data, tests } })
                 }}><Plus size={14} /> Ajouter un test</button>
               </div>
-            </div>
+            </div>}
           </>
         )}
 

@@ -107,7 +107,7 @@ export function buildExtraExams() {
     },
     {
       id: 14, matiereId: 1, title: 'Examen - C, C++ et Java : bases', durationMin: 90,
-      description: 'Langages compilés : exécution par le serveur de correction (Docker).',
+      description: 'C exécuté dans le navigateur ; C++ et Java écrits dans l\'éditeur et corrigés par l\'enseignant.',
       questions: [
         code('c', 'C : lire n puis n entiers et afficher leur moyenne avec 2 décimales.',
           '#include <stdio.h>\n\nint main(void) {\n    int n;\n    scanf("%d", &n);\n    // à compléter\n    return 0;\n}\n',
@@ -164,7 +164,17 @@ export function buildExtraExams() {
     ],
   })
 
-  const codes = { 10: 'PYTP10', 11: 'JSEX11', 12: 'ALGO12', 13: 'SQL013', 14: 'CJAV14', 15: 'WEB015', 16: 'PHP016' }
+  exams.push({
+    id: 17, matiereId: 1, title: 'TP noté - OCaml', durationMin: 60,
+    description: 'Programme OCaml écrit dans l\'éditeur et corrigé par l\'enseignant.',
+    questions: [
+      code('ocaml', 'OCaml : lire un entier n et afficher n! (factorielle), avec une fonction récursive.',
+        'let rec fact n =\n  (* à compléter *)\n  1\n\nlet () =\n  let n = int_of_string (read_line ()) in\n  print_int (fact n);\n  print_newline ()\n',
+        [{ name: 'n = 5', stdin: '5', expected: '120', points: 2 }, { name: 'n = 10', stdin: '10', expected: '3628800', points: 2, hidden: true }], 5000),
+    ],
+  })
+
+  const codes = { 10: 'PYTP10', 11: 'JSEX11', 12: 'ALGO12', 13: 'SQL013', 14: 'CJAV14', 15: 'WEB015', 16: 'PHP016', 17: 'OCA017' }
   const assessments = exams.map((e) => ({
     schoolId: 1, teacherId: 2, classeId: 1, kind: 'examen', status: 'publie',
     startAt: at(-1 * H), endAt: at(30 * D, 18, 0), maxAttempts: 1,

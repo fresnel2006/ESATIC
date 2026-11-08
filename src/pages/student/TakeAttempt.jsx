@@ -1,21 +1,23 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+﻿import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
-  Maximize, Check, CloudUpload, CloudOff, Loader2, Play, ChevronLeft, ChevronRight,
-  Monitor, Send, CircleCheck, FileCode2, TriangleAlert,
+  Maximize, Check, CloudUpload, CloudOff, Loader2, Play, ChevronLeft, ChevronRight, Globe, ListChecks,
+  Monitor, Send, CircleCheck, FileCode2, TriangleAlert, Info,
 } from 'lucide-react'
 import * as api from '../../api/index.js'
 import Logo from '../../components/Logo.jsx'
 import CodeEditor from '../../components/CodeEditor.jsx'
 import Statement from '../../components/Statement.jsx'
 import Terminal from '../../components/RunConsole.jsx'
-import { warmUp } from '../../lib/browserRunner.js'
+import { prepareEngine } from '../../lib/engines.js'
+import { useExecution } from '../../lib/useExecution.js'
+import { EngineLine } from '../../components/EngineStatus.jsx'
 import { TEST_MODE } from '../../config.js'
 import { Loader, Modal, Notice, ErrorBox, ICON } from '../../components/ui.jsx'
-import { WebEditor, webValue } from '../../components/WebPlayground.jsx'
+import { WebEditor, WebPreview, webValue } from '../../components/WebPlayground.jsx'
 import ExamOutline, { outlineOf } from '../../components/ExamOutline.jsx'
 import { useExamGuard } from '../../lib/useExamGuard.js'
-import { fmtDuration, fmtRelativeDay, fmtTime, LANGUAGES, LANG_ENV, QUESTION_TYPES } from '../../lib/format.js'
+import { fmtDuration, fmtRelativeDay, fmtTime, isWriteOnly, LANGUAGES, LANG_ENV, QUESTION_TYPES } from '../../lib/format.js'
 
 const DESKTOP_ONLY = ['code', 'sql', 'html']
 
@@ -48,14 +50,15 @@ function useTerminal(language) {
   const [running, setRunning] = useState(false)
   const [first, setFirst] = useState(false)
   useEffect(() => {
-    if (TEST_MODE.runCodeInBrowser) warmUp(language)?.then(() => warmed.add(language))
+    if (TEST_MODE.runCodeInBrowser) prepareEngine(language).then(() => warmed.add(language))
   }, [language])
-  async function launch(payload) {
+  // mode 'run' : exécuter le programme avec l'entrée saisie ; 'tests' : vérifier les exemples
+  async function launch(payload, mode = 'run') {
     setFirst(!warmed.has(language))
-    setRunning(true)
+    setRunning(mode)
     const result = await api.runCode({ language, ...payload })
     warmed.add(language)
-    setHistory((h) => [...h.slice(-9), { command: LANG_ENV[language]?.run ?? language, result, language }])
+    setHistory((h) => [...h.slice(-9), { command: LANG_ENV[language]?.run ?? language, result, language, mode }])
     setRunning(false)
   }
   return { history, running, first, launch, clear: () => setHistory([]) }
@@ -74,7 +77,14 @@ function CodeQuestion({ q, value, onChange, onBigInsert }) {
   const [stdin, setStdin] = useState(q.data.tests?.[0]?.stdin ?? '')
   const code = value ?? q.data.starter ?? ''
   const term = useTerminal(q.data.language)
-  const run = () => term.launch({ code, stdin, tests: q.data.tests || [], timeLimitMs: q.data.timeLimitMs || 2000 })
+  // Langage sans exécution (C++, Java, OCaml, pseudo-code) :
+  // l'étudiant écrit son code normalement, sans bouton Lancer, ni entrée, ni exemples, ni terminal
+  const execution = useExecution()
+  const runnable = execution.canRun(q.data.language)
+  const limitMs = q.data.timeLimitMs || 2000
+  // Lancer : le programme seul, avec l'entrée saisie. Tester : les exemples de l'énoncé, sans exécution libre.
+  const run = () => term.launch({ code, stdin, tests: [], timeLimitMs: limitMs }, 'run')
+  const test = () => term.launch({ code, stdin: '', tests: q.data.tests || [], timeLimitMs: limitMs, runCustom: false }, 'tests')
   return (
     <div className="stack-sm">
       <div className="code-area">
@@ -82,28 +92,65 @@ function CodeQuestion({ q, value, onChange, onBigInsert }) {
           <FileTab language={q.data.language} />
           <span className="small muted">Le copier-coller fonctionne à l'intérieur de vos réponses.</span>
           <div className="spacer" />
-          <button className="btn btn-primary btn-sm" onClick={run} disabled={term.running}><Play size={14} /> Lancer</button>
+          {runnable && (q.data.tests || []).length > 0 && (
+            <button className="btn btn-secondary btn-sm" onClick={test} disabled={!!term.running}><ListChecks size={14} /> Tester les exemples</button>
+          )}
+          {runnable && <button className="btn btn-primary btn-sm" onClick={run} disabled={!!term.running}><Play size={14} /> Lancer</button>}
         </div>
+        {runnable && <EngineLine lang={q.data.language} />}
+        {execution.known && !runnable && (
+          <div className="engine-line no-run">
+            <Info size={14} />
+            <span>
+              {isWriteOnly(q.data.language)
+                ? 'Le pseudo-code ne s\'exécute pas : écrivez votre algorithme dans l\'éditeur. Il est enregistré automatiquement et sera corrigé par l\'enseignant.'
+                : `L'exécution du ${LANGUAGES[q.data.language]} n'est pas disponible sur la plateforme. Écrivez votre programme normalement : il est enregistré automatiquement et sera corrigé par l'enseignant.`}
+            </span>
+          </div>
+        )}
         <CodeEditor value={code} language={q.data.language} onChange={onChange} onBigInsert={onBigInsert} height={380} />
       </div>
-      <div className="form-grid cols-2">
-        <div className="field">
-          <label>Entrée du programme (ce que l'utilisateur tape, une ligne par lecture)</label>
-          <textarea className="textarea mono answer-zone" style={{ minHeight: 70 }} value={stdin} onChange={(e) => setStdin(e.target.value)} />
-        </div>
-        <div className="field">
-          <label>Exemples</label>
-          <div className="small" style={{ color: 'var(--text-2)' }}>
-            {(q.data.tests || []).map((t) => (
-              <div key={t.id} className="mono no-select" style={{ marginBottom: 6 }}>
-                Entrée : {t.stdin.replace(/\n/g, ' / ')} &nbsp;Sortie attendue : {t.expected}
-              </div>
-            ))}
-            {q.data.hiddenTestCount > 0 && <div className="muted">+ {q.data.hiddenTestCount} test(s) caché(s) utilisés pour la note.</div>}
+      {/* Entrée, exemples et terminal : seulement pour les langages qu'on peut exécuter */}
+      {runnable && (
+        <div className="form-grid cols-2">
+          <div className="field">
+            <label>Entrée du programme (ce que l'utilisateur tape, une ligne par lecture)</label>
+            <textarea className="textarea mono answer-zone" style={{ minHeight: 70 }} value={stdin} onChange={(e) => setStdin(e.target.value)} />
+          </div>
+          <div className="field">
+            <label>Exemples</label>
+            <div className="small" style={{ color: 'var(--text-2)' }}>
+              {(q.data.tests || []).map((t) => (
+                <div key={t.id} className="mono no-select" style={{ marginBottom: 6 }}>
+                  Entrée : {t.stdin.replace(/\n/g, ' / ')} &nbsp;Sortie attendue : {t.expected}
+                </div>
+              ))}
+              {q.data.hiddenTestCount > 0 && <div className="muted">+ {q.data.hiddenTestCount} test(s) caché(s) utilisés pour la note.</div>}
+            </div>
           </div>
         </div>
+      )}
+      {runnable && <Terminal language={q.data.language} history={term.history} running={term.running} first={term.first} onClear={term.clear} />}
+      {runnable && q.data.language === 'php' && <PhpPageRender history={term.history} />}
+    </div>
+  )
+}
+
+// PHP qui produit du HTML (echo "<h1>...", tableau construit dans une boucle...) : la sortie du dernier
+// lancement est aussi montrée comme une vraie page, dans un cadre isolé, comme l'aperçu des questions web
+const LOOKS_LIKE_HTML = /<\s*(!doctype|html|head|body|div|p|h[1-6]|table|tr|td|th|ul|ol|li|span|a|img|form|input|button|br|hr|b|i|strong|em|section|article|header|footer|nav|style|label|select|textarea)\b/i
+
+function PhpPageRender({ history }) {
+  const last = history[history.length - 1]?.result
+  const html = last?.stdout || ''
+  if (!LOOKS_LIKE_HTML.test(html)) return null
+  return (
+    <div className="stack-sm php-render">
+      <div className="row small muted">
+        <Globe size={15} strokeWidth={1.6} /> Rendu de la page produite par main.php (dernier lancement)
       </div>
-      <Terminal language={q.data.language} history={term.history} running={term.running} first={term.first} onClear={term.clear} />
+      <WebPreview value={{ html, css: '', js: '' }} height={320} title="Rendu de la page PHP" address="localhost/main.php" showConsole={false} />
+      <span className="hint">Les liens et les envois de formulaires ne rappellent pas le programme PHP dans cet aperçu.</span>
     </div>
   )
 }
@@ -124,6 +171,7 @@ function SqlQuestion({ q, value, onChange, onBigInsert }) {
             <Play size={14} /> Exécuter
           </button>
         </div>
+        <EngineLine lang="sql" />
         <CodeEditor value={value ?? ''} language="sql" onChange={onChange} onBigInsert={onBigInsert} height={220} />
       </div>
       <Terminal language="sql" history={term.history} running={term.running} first={term.first} onClear={term.clear} />

@@ -1,4 +1,4 @@
-// Données de démonstration. Les dates sont calculées à partir de "maintenant"
+﻿// Données de démonstration. Les dates sont calculées à partir de "maintenant"
 // pour que la démo reste cohérente quel que soit le jour où on la lance.
 
 const H = 3600 * 1000
@@ -86,31 +86,20 @@ export function applyDemoSections(a) {
 
 // Outils informatiques de chaque matière de démonstration (code de la matière -> outils)
 export const DEFAULT_TOOLS = {
-  PROG: ['c', 'cpp', 'java'],
+  PROG: ['c', 'cpp', 'java', 'ocaml'],
   BDD: ['sql'],
   WEB: ['html', 'javascript', 'php'],
   PY: ['python'],
-  ALGO: ['c', 'python', 'java', 'javascript', 'sql'],
+  ALGO: ['algo', 'c', 'python', 'java', 'javascript', 'sql'],
   MATH: [],
 }
 
-// Notes saisies à la main par l'administration (oral, TP papier) pour le Semestre 1, L2 Informatique A
-export function demoManualGrades() {
-  const g = (id, studentId, matiereId, label, score) => ({ id, schoolId: 1, periodeId: 1, classeId: 1, studentId, matiereId, label, score, createdAt: new Date().toISOString(), by: 1 })
-  return [
-    g(1, 10, 1, 'TP papier - Tableaux', 14), g(2, 10, 2, 'Oral - Modélisation', 15.5), g(3, 10, 4, 'TP papier - Fonctions', 13), g(4, 10, 5, 'Interrogation écrite', 16), g(5, 10, 6, 'Devoir surveillé papier', 12.5),
-    g(6, 11, 1, 'TP papier - Tableaux', 12), g(7, 11, 2, 'Oral - Modélisation', 13), g(8, 11, 4, 'TP papier - Fonctions', 15), g(9, 11, 5, 'Interrogation écrite', 11), g(10, 11, 6, 'Devoir surveillé papier', 14),
-    g(11, 12, 1, 'TP papier - Tableaux', 9), g(12, 12, 2, 'Oral - Modélisation', 10.5), g(13, 12, 4, 'TP papier - Fonctions', 8), g(14, 12, 5, 'Interrogation écrite', 10), g(15, 12, 6, 'Devoir surveillé papier', 7.5),
-    g(16, 13, 1, 'TP papier - Tableaux', 16), g(17, 13, 2, 'Oral - Modélisation', 17), g(18, 13, 4, 'TP papier - Fonctions', 15.5), g(19, 13, 5, 'Interrogation écrite', 14), g(20, 13, 6, 'Devoir surveillé papier', 16),
-    g(21, 14, 1, 'TP papier - Tableaux', 11), g(22, 14, 2, 'Oral - Modélisation', 12), g(23, 14, 5, 'Interrogation écrite', 9.5),
-    g(24, 15, 1, 'TP papier - Tableaux', 13), g(25, 15, 4, 'TP papier - Fonctions', 12),
-  ]
-}
 
 export const DEMO_ACCOUNTS = [
   { role: 'admin', login: 'ADM001', password: 'Admin2026!', label: 'Administrateur' },
   { role: 'teacher', login: 'ENS001', password: 'Prof2026!', label: 'Enseignant' },
   { role: 'proctor', login: 'SUR001', password: 'Surv2026!', label: 'Surveillant' },
+  { role: 'educator', login: 'EDU001', password: 'Educ2026!', label: 'Éducateur' },
   { role: 'student', login: 'ETU24001', password: 'Etudiant2026!', label: 'Étudiant' },
   { role: 'student', login: 'ETU24006', password: 'Provisoire1', label: 'Étudiant (1re connexion)' },
 ]
@@ -118,7 +107,7 @@ export const DEMO_ACCOUNTS = [
 export async function buildSeed(hash = hashPassword) {
   const SCHOOL = 1
   const pw = {}
-  for (const p of ['Admin2026!', 'Prof2026!', 'Surv2026!', 'Etudiant2026!', 'Provisoire1']) {
+  for (const p of ['Admin2026!', 'Prof2026!', 'Surv2026!', 'Educ2026!', 'Etudiant2026!', 'Provisoire1']) {
     pw[p] = await hash(p)
   }
 
@@ -148,6 +137,7 @@ export async function buildSeed(hash = hashPassword) {
     u(2, 'teacher', 'ENS001', 'Yao', 'Kouassi', { passwordHash: pw['Prof2026!'] }),
     u(3, 'teacher', 'ENS002', 'Awa', 'Bamba', { passwordHash: pw['Prof2026!'] }),
     u(4, 'proctor', 'SUR001', 'Mamadou', 'Koné', { passwordHash: pw['Surv2026!'] }),
+    u(5, 'educator', 'EDU001', 'Adjoua', 'Brou', { passwordHash: pw['Educ2026!'] }),
     u(10, 'student', 'ETU24001', 'Fresnel', 'Traore', { passwordHash: pw['Etudiant2026!'], classeId: 1 }),
     u(11, 'student', 'ETU24002', 'Aminata', 'Diallo', { passwordHash: pw['Etudiant2026!'], classeId: 1 }),
     u(12, 'student', 'ETU24003', 'Jean', 'Konan', { passwordHash: pw['Etudiant2026!'], classeId: 1 }),
@@ -523,7 +513,7 @@ public class Main {
     },
     filieres, classes, matieres, periodes, users, teaching, assessments, sessions, attempts, bank,
     announcements, notifications, audit,
-    bulletins: [], manualGrades: demoManualGrades(),
-    seq: { structure: STRUCTURE_VERSION, bulletin: 100, manualGrade: 100, user: 100, classe: 50, filiere: 20, matiere: 10, periode: 10, teaching: 20, assessment: 20, question: 1000, session: 40, attempt: 50, bank: 1000, announcement: 10, notification: 50, audit: 50 },
+    bulletins: [],
+    seq: { structure: STRUCTURE_VERSION, bulletin: 100, user: 100, classe: 50, filiere: 20, matiere: 10, periode: 10, teaching: 20, assessment: 20, question: 1000, session: 40, attempt: 50, bank: 1000, announcement: 10, notification: 50, audit: 50 },
   }
 }

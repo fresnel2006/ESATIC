@@ -621,7 +621,6 @@ h2, h3 { font-weight: 600; }
 .verify-result.ok .row { color: var(--success); }
 .verify-result.ko { background: var(--danger-soft); }
 .verify-result.ko .row { color: var(--danger); }
-.auth-verify { margin-top: 10px; font-size: 0.85rem; }
 
 /* Profil en lecture seule */
 .info-list { margin: 0; display: flex; flex-direction: column; }
@@ -848,3 +847,24 @@ h2, h3 { font-weight: 600; }
 .test-access-head { display: flex; align-items: center; gap: 8px; font-size: 0.82rem; font-weight: 600; color: var(--text-2); margin-bottom: 10px; }
 .test-access-list { display: flex; flex-wrap: wrap; gap: 8px; }
 .test-access-list .btn { gap: 8px; }
+
+/* Barre d'avancement (téléchargement des moteurs, dépôt des bulletins) */
+.exec-progress { height: 6px; border-radius: 999px; background: var(--neutral-soft); overflow: hidden; }
+.exec-progress span { display: block; height: 100%; background: var(--success); border-radius: inherit; transition: width 0.4s; }
+
+/* Terminal : « Tester les exemples », valeurs sur plusieurs lignes alignées sous leur intitulé */
+.t-field { display: grid; grid-template-columns: 8ch 1fr; gap: 0 1ch; margin: 1px 0; }
+.t-value { margin: 0; white-space: pre-wrap; }
+
+/* Téléchargement des moteurs d'exécution (étudiant) : avancement en Mo */
+.engine-status { display: grid; gap: 6px; }
+.engine-line { display: flex; align-items: center; gap: 8px; padding: 8px 12px; font-size: 13px; color: var(--text-2); background: var(--neutral-soft); border-bottom: 1px solid var(--border); }
+.engine-status .engine-line { border: 1px solid var(--border); border-radius: 8px; }
+.engine-line .engine-text { flex: 1; display: grid; gap: 5px; }
+.engine-line.ready { color: var(--success); }
+.engine-line.error { color: var(--danger, #b42318); }
+.engine-line.error span { flex: 1; }
+
+/* Dépôt groupé des bulletins : fichiers ignorés ou en erreur */
+.bulk-list { margin: 4px 0 0; padding-left: 18px; max-height: 160px; overflow: auto; }
+.bulk-list li { margin: 2px 0; }

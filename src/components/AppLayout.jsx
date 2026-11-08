@@ -34,7 +34,6 @@ const EXTRA_TITLES = [
   ['/compte/profil', 'Profil'],
   ['/compte/mot-de-passe', 'Mot de passe'],
   ['/etudiant/epreuve/', 'Épreuve'],
-  ['/etudiant/bulletins/', 'Bulletin'],
 ]
 
 function currentTitle(items, pathname) {

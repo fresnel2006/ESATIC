@@ -4,7 +4,7 @@
 // - dans le navigateur en mode démo, avec les données dans localStorage.
 // Ce qui dépend de l'endroit (stockage, jeton de session, hachage) passe par "platform".
 
-import { buildSeed, hashPassword, DEFAULT_TOOLS, demoManualGrades, applyDemoSections, schoolStructure, STRUCTURE_VERSION } from './seed.js'
+import { buildSeed, hashPassword, DEFAULT_TOOLS, applyDemoSections, schoolStructure, STRUCTURE_VERSION } from './seed.js'
 import { buildExtraExams } from './seedExams.js'
 import { TOOLS, SQL_LIMITS, sqlSizeKb } from '../lib/format.js'
 import { TEST_MODE } from '../config.js'
@@ -28,7 +28,20 @@ const platform = {
   clearToken: () => platform.clearToken(),
   hash: hashPassword,
   delay: (ms) => new Promise((r) => setTimeout(r, ms)),
+  // Fichiers déposés (bulletins) : gardés dans le navigateur en mode démo
+  files: {
+    put: async (key, bytes) => {
+      demoFiles.set(key, bytes)
+      try { localStorage.setItem(`esatic-demo-file-${key}`, JSON.stringify(Array.from(bytes))) } catch { /* stockage plein : gardé jusqu'au rechargement */ }
+    },
+    get: async (key) => {
+      if (demoFiles.has(key)) return demoFiles.get(key)
+      try { const a = JSON.parse(localStorage.getItem(`esatic-demo-file-${key}`)); return a ? new Uint8Array(a) : null } catch { return null }
+    },
+    remove: (key) => { demoFiles.delete(key); localStorage.removeItem(`esatic-demo-file-${key}`) },
+  },
 }
+const demoFiles = new Map()
 
 // Le serveur remplace le stockage, le jeton et le hachage
 export function configurePlatform(overrides) {
@@ -67,6 +80,7 @@ async function load() {
   if (stored?.users) {
     demoDb = stored
     migrate()
+    await addDemoEducator()
     return demoDb
   }
   demoDb = await buildSeed(platform.hash)
@@ -78,8 +92,21 @@ async function load() {
 export async function buildInitialData() {
   return buildSeed(platform.hash)
 }
-export function migrateData() {
+export async function migrateData() {
   migrate()
+  await addDemoEducator()
+}
+
+// Base de démonstration créée avant le rôle Éducateur : ajout du compte EDU001 (dépôt des bulletins)
+async function addDemoEducator() {
+  const isDemo = db.school?.demo ?? db.users.some((u) => u.matricule === 'ETU24001')
+  if (!isDemo || db.users.some((u) => u.matricule === 'EDU001')) return
+  db.users.push({
+    id: nextId('user'), schoolId: db.school.id ?? 1, role: 'educator', matricule: 'EDU001', firstName: 'Adjoua', lastName: 'Brou',
+    email: 'adjoua.brou@esatic.ci', passwordHash: await platform.hash('Educ2026!'), mustChangePassword: false, active: true,
+    classeId: null, createdAt: now(), lastLoginAt: null, activeToken: null,
+  })
+  save()
 }
 
 // Mise à niveau d'une base de démo créée par une version précédente
@@ -90,6 +117,9 @@ function migrate() {
       m.tools = DEFAULT_TOOLS[m.code] ?? []
       changed = true
     }
+    // Outils retirés de la plateforme (C#) : enlevés des matières
+    const kept = m.tools.filter((t) => t in TOOLS)
+    if (kept.length !== m.tools.length) { m.tools = kept; changed = true }
   }
   for (const a of db.assessments) {
     if (!Array.isArray(a.languages)) {
@@ -106,6 +136,30 @@ function migrate() {
   // (Base de démo : school.demo vrai ; les bases de démo plus anciennes se reconnaissent au compte ETU24001.)
   const isDemo = db.school?.demo ?? db.users.some((u) => u.matricule === 'ETU24001')
   if (isDemo) {
+    // Nouveaux outils des matières de démonstration (ajoutés, jamais retirés)
+    for (const m of db.matieres) {
+      for (const t of DEFAULT_TOOLS[m.code] || []) {
+        if (Array.isArray(m.tools) && !m.tools.includes(t)) { m.tools.push(t); changed = true }
+      }
+    }
+    // Questions de démonstration dans un langage retiré (C#) : enlevées, épreuve renommée
+    for (const a of db.assessments) {
+      const qs = (a.questions || []).filter((x) => x.type !== 'code' || x.data?.language in TOOLS)
+      if (qs.length !== (a.questions || []).length) {
+        a.questions = qs
+        a.languages = languagesOf(qs)
+        if (a.id === 17) a.title = 'TP noté - OCaml'
+        changed = true
+      }
+    }
+    // Descriptions de démonstration qui parlaient du service d'exécution (retiré)
+    const DEMO_DESC = {
+      14: 'C exécuté dans le navigateur ; C++ et Java écrits dans l\'éditeur et corrigés par l\'enseignant.',
+      17: 'Programme OCaml écrit dans l\'éditeur et corrigé par l\'enseignant.',
+    }
+    for (const a of db.assessments) {
+      if (DEMO_DESC[a.id] && /Docker|service d'exécution/.test(a.description || '')) { a.description = DEMO_DESC[a.id]; changed = true }
+    }
     // Nouveaux examens de programmation de démonstration (ajoutés sans toucher au reste)
     const extra = buildExtraExams()
     for (const a of extra.assessments) {
@@ -146,11 +200,11 @@ function migrate() {
     db.seq.filiere = Math.max(db.seq.filiere, ...db.filieres.map((f) => f.id))
     changed = true
   }
-  // Bulletins (ajoutés après coup) : tables et notes manuelles de démonstration
+  // Bulletins : fichiers déposés par l'établissement. Les anciens bulletins calculés à partir des notes
+  // (sans fichier) sont retirés.
   if (!Array.isArray(db.bulletins)) { db.bulletins = []; changed = true }
-  if (!Array.isArray(db.manualGrades)) { db.manualGrades = isDemo ? demoManualGrades() : []; changed = true }
+  if (db.bulletins.some((b) => !b.fileKey)) { db.bulletins = db.bulletins.filter((b) => b.fileKey); changed = true }
   db.seq.bulletin ??= 100
-  db.seq.manualGrade ??= 100
   if (changed) save()
 }
 
@@ -1229,10 +1283,11 @@ function autoGrade(att, a) {
   }
 }
 
-// POST /api/run  (exécution dans le bac à sable)
-// Futur serveur : exécution dans un conteneur Docker isolé, pour tous les langages.
-// Mode test : Python, JavaScript et SQL tournent dans un Web Worker du navigateur. Ce résultat sert à
-// essayer son code ; il n'est jamais utilisé pour la note (il pourrait être modifié côté poste).
+// POST /api/run
+// Le code d'un étudiant s'exécute dans son navigateur (Web Worker isolé, temps limité), jamais sur le serveur :
+// Python, JavaScript, SQL, PHP et C (de base). Les autres langages (C++, Java, OCaml, pseudo-code) s'écrivent
+// sans s'exécuter : l'enseignant les corrige à la main.
+// Le résultat montré à l'étudiant sert à essayer son code ; la note vient de la correction.
 // { language, code, stdin, tests: [{ name, stdin, expected }], timeLimitMs, schemaSql, seedSql }
 export async function runCode(params = {}) {
   await load()
@@ -1240,14 +1295,13 @@ export async function runCode(params = {}) {
   return executeCode(params)
 }
 
-// Exécution seule, sans accès aux données : appelée directement par le navigateur quand les données
-// sont sur le serveur (le code des étudiants ne tourne jamais sur le serveur Node.js)
-export async function executeCode({ language, code = '', stdin = '', tests = [], timeLimitMs = 2000, schemaSql = '', seedSql = '' } = {}) {
+// Exécution seule, sans accès aux données
+export async function executeCode({ language, code = '', stdin = '', tests = [], timeLimitMs = 2000, schemaSql = '', seedSql = '', runCustom = true } = {}) {
   if (!TEST_MODE.runCodeInBrowser || !BROWSER_LANGS.includes(language)) {
     await wait(300)
     return {
       available: false,
-      message: `L'exécution du ${LANGUAGE_NAMES[language] || 'code'} se fera dans le bac à sable du serveur de correction (Docker), qui n'est pas encore branché. Votre code est bien enregistré.`,
+      message: `L'exécution du ${LANGUAGE_NAMES[language] || 'code'} n'est pas disponible sur la plateforme. Votre code est bien enregistré ; l'enseignant le corrigera.`,
     }
   }
   if (language === 'sql') {
@@ -1263,7 +1317,8 @@ export async function executeCode({ language, code = '', stdin = '', tests = [],
     })
     if (r.failed) break
   }
-  const custom = await runInBrowser(language, { code, stdin }, timeLimitMs)
+  // Exécution libre avec l'entrée saisie (bouton Lancer) ; absente quand on ne teste que les exemples
+  const custom = !runCustom ? { stdout: '', stderr: '', transcript: [] } : await runInBrowser(language, { code, stdin }, timeLimitMs)
   return {
     available: true, browser: true, results, timeLimitMs,
     stdout: custom.stdout, stderr: custom.stderr, timeout: !!custom.timeout,
@@ -1271,7 +1326,7 @@ export async function executeCode({ language, code = '', stdin = '', tests = [],
   }
 }
 
-const LANGUAGE_NAMES = { c: 'code C', cpp: 'code C++', java: 'code Java', php: 'code PHP', python: 'code Python', javascript: 'code JavaScript', sql: 'SQL' }
+const LANGUAGE_NAMES = { c: 'code C', cpp: 'code C++', java: 'code Java', php: 'code PHP', python: 'code Python', javascript: 'code JavaScript', sql: 'SQL', ocaml: 'code OCaml', algo: 'pseudo-code' }
 
 // ---------------------------------------------------------------------------
 // Correction (enseignant)
@@ -1389,7 +1444,6 @@ function recomputeAttempt(t, a) {
 }
 
 // POST /api/grading/{attemptId}/autograde : exécute TOUS les tests (cachés compris) et compare le SQL.
-// Futur serveur : fait dans le bac à sable Docker ; mode test : dans le navigateur de l'enseignant.
 // Se fait en trois temps pour que le code tourne dans le navigateur de l'enseignant et jamais sur le
 // serveur : autoGradeJobs (données) -> runAutoGradeJobs (exécution) -> applyAutoGrade (notes).
 export async function autoGradeCopy(attemptId) {
@@ -1410,8 +1464,12 @@ export async function autoGradeJobs(attemptId) {
   for (const q of a.questions) {
     const value = t.answers[q.id]?.value
     if (typeof value !== 'string' || !value.trim()) continue
-    if (q.type === 'code' && TEST_MODE.runCodeInBrowser && BROWSER_LANGS.includes(q.data.language)) {
-      jobs.push({ questionId: q.id, kind: 'code', language: q.data.language, code: value, timeLimitMs: q.data.timeLimitMs || 2000, tests: (q.data.tests || []).map((x) => ({ stdin: x.stdin })) })
+    // Seuls les langages exécutables dans le navigateur sont corrigés automatiquement ;
+    // les autres (C++, Java, OCaml, pseudo-code) restent à corriger à la main
+    const lang = q.data?.language
+    const inBrowser = TEST_MODE.runCodeInBrowser && BROWSER_LANGS.includes(lang)
+    if (q.type === 'code' && inBrowser) {
+      jobs.push({ questionId: q.id, kind: 'code', language: lang, code: value, timeLimitMs: q.data.timeLimitMs || 2000, tests: (q.data.tests || []).map((x) => ({ stdin: x.stdin })) })
     }
     if (q.type === 'sql') {
       jobs.push({ questionId: q.id, kind: 'sql', schema: q.data.schemaSql, seed: q.data.seedSql, query: value, expected: q.data.expectedQuery, orderMatters: !!q.data.orderMatters })
@@ -1420,7 +1478,7 @@ export async function autoGradeJobs(attemptId) {
   return jobs
 }
 
-// Exécution dans le navigateur, sans accès aux données
+// Exécution des codes à corriger, dans le navigateur de l'enseignant
 export async function runAutoGradeJobs(jobs) {
   const out = {}
   for (const job of jobs) {
@@ -1875,9 +1933,10 @@ export async function search(qs) {
 
 // ---------------------------------------------------------------------------
 // Bulletins
-// Notes de la plateforme (épreuves dont les notes sont publiées) + notes saisies à la main (oral, TP papier).
-// Moyenne par matière = moyenne simple des notes ; moyenne générale pondérée par les coefficients des matières.
-// Publication par l'administrateur ; toute modification d'un bulletin publié crée une nouvelle version.
+// Les bulletins sont faits par l'établissement (hors plateforme). Les éducateurs (ou l'administration)
+// déposent le fichier de chaque étudiant (PDF ou image) ; l'étudiant le retrouve dans son espace et le
+// télécharge. Les notes des épreuves en ligne ne servent pas à calculer les bulletins.
+// Le fichier est rangé à part (platform.files), la liste des bulletins ne garde que sa description.
 // ---------------------------------------------------------------------------
 
 const round2 = (n) => Math.round(n * 100) / 100
@@ -1891,172 +1950,131 @@ export function mentionFor(avg) {
   return 'Insuffisant'
 }
 
-function appreciationFor(avg) {
-  if (avg === null) return 'Pas de note sur la période.'
-  if (avg >= 16) return 'Excellent travail.'
-  if (avg >= 14) return 'Très bon travail.'
-  if (avg >= 12) return 'Bon travail, à poursuivre.'
-  if (avg >= 10) return 'Résultats corrects, des efforts restent à faire.'
-  if (avg >= 8) return 'Résultats fragiles, travail à renforcer.'
-  return 'Résultats insuffisants.'
+export const BULLETIN_MAX_BYTES = 2 * 1024 * 1024
+const BULLETIN_TYPES = [
+  { mime: 'application/pdf', ext: 'pdf', magic: [0x25, 0x50, 0x44, 0x46] }, // %PDF
+  { mime: 'image/png', ext: 'png', magic: [0x89, 0x50, 0x4e, 0x47] },
+  { mime: 'image/jpeg', ext: 'jpg', magic: [0xff, 0xd8, 0xff] },
+]
+const BULLETIN_STAFF = ['admin', 'educator']
+
+function decodeBase64(b64) {
+  const bin = atob(String(b64 || ''))
+  const bytes = new Uint8Array(bin.length)
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
+  return bytes
 }
 
-function bulletinTemplate() {
-  const s = db.school.settings
-  s.bulletin ||= { title: 'Bulletin de notes', signatory: 'Le Directeur des études', footer: 'Document généré par la plateforme d\'évaluations de l\'ESATIC.' }
-  return s.bulletin
+// Clé du fichier : empreinte de son contenu (un même dépôt rejoué ne crée pas de doublon)
+async function fileKey(bytes) {
+  const hash = new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))
+  return 'b' + Array.from(hash.slice(0, 16), (x) => x.toString(16).padStart(2, '0')).join('')
 }
 
-const inPeriod = (iso, p) => !!iso && iso.slice(0, 10) >= p.start && iso.slice(0, 10) <= p.end
+const bulletinInfo = (b) => ({
+  id: b.id, periodeId: b.periodeId, classeId: b.classeId, studentId: b.studentId,
+  fileName: b.fileName, mime: b.mime, size: b.size, version: b.version,
+  uploadedAt: b.uploadedAt, uploadedBy: userName(b.uploadedBy),
+})
+function userName(id) {
+  const u = db.users.find((x) => x.id === id)
+  return u ? `${u.firstName} ${u.lastName}` : ''
+}
 
-function computeBulletins(periodeId, classeId) {
+// Périodes et classes proposées pour le dépôt
+export async function bulletinOptions() {
+  await load()
+  requireUser(...BULLETIN_STAFF)
+  const counts = {}
+  for (const u of db.users) if (u.role === 'student' && u.active) counts[u.classeId] = (counts[u.classeId] || 0) + 1
+  return clone({
+    periodes: [...db.periodes].sort((a, b) => (a.start > b.start ? -1 : 1)),
+    classes: db.classes.map((c) => ({ id: c.id, name: c.name, level: c.level, filiereId: c.filiereId, students: counts[c.id] || 0 })),
+    maxBytes: BULLETIN_MAX_BYTES,
+  })
+}
+
+// Étudiants d'une classe et bulletin déposé (ou non) pour la période
+export async function listBulletins(periodeId, classeId) {
+  await load()
+  requireUser(...BULLETIN_STAFF)
   const p = db.periodes.find((x) => x.id === Number(periodeId))
   const c = db.classes.find((x) => x.id === Number(classeId))
   if (!p || !c) throw new ApiError('Choisissez une période et une classe.')
-  const students = db.users.filter((u) => u.role === 'student' && u.classeId === c.id && u.active).sort((x, y) => x.lastName.localeCompare(y.lastName))
-  const matiereIds = [...new Set(db.teaching.filter((t) => t.classeId === c.id).map((t) => t.matiereId))]
-  const matieres = db.matieres.filter((m) => matiereIds.includes(m.id))
-  const exams = db.assessments.filter((a) => a.classeId === c.id && a.resultsPublished && a.status !== 'annule' && inPeriod(a.endAt, p))
-
-  const rows = students.map((s) => {
-    const lines = matieres.map((m) => {
-      const notes = []
-      for (const a of exams.filter((x) => x.matiereId === m.id)) {
-        const best = db.attempts.filter((t) => t.assessmentId === a.id && t.studentId === s.id && t.status === 'corrige').sort((x, y) => y.score - x.score)[0]
-        if (best) notes.push({ label: a.title, note20: round2((best.score / best.maxScore) * 20), source: a.kind === 'examen' ? 'Examen' : 'Devoir' })
-      }
-      for (const g of db.manualGrades.filter((x) => x.periodeId === p.id && x.studentId === s.id && x.matiereId === m.id)) {
-        notes.push({ label: g.label, note20: g.score, source: 'Saisie' })
-      }
-      const avg = notes.length ? round2(notes.reduce((t, n) => t + n.note20, 0) / notes.length) : null
-      return { matiereId: m.id, matiere: m.name, coefficient: m.coefficient, notes, avg, appreciation: appreciationFor(avg) }
-    })
-    const counted = lines.filter((l) => l.avg !== null)
-    const coefs = counted.reduce((t, l) => t + Number(l.coefficient), 0)
-    const general = coefs ? round2(counted.reduce((t, l) => t + l.avg * l.coefficient, 0) / coefs) : null
-    return { student: s, lines, general, mention: mentionFor(general) }
-  })
-  // Rang (ex aequo : même rang)
-  const ranked = rows.filter((r) => r.general !== null).sort((x, y) => y.general - x.general)
-  for (const r of rows) r.rank = r.general === null ? null : ranked.findIndex((x) => x.general === r.general) + 1
-  const generals = ranked.map((r) => r.general)
-  const classStats = generals.length ? { average: round2(generals.reduce((t, n) => t + n, 0) / generals.length), max: Math.max(...generals), min: Math.min(...generals) } : null
-  return { periode: p, classe: c, rows, effectif: students.length, classStats }
-}
-
-function bulletinSnapshot(calc, row, appreciationGenerale) {
-  const tpl = bulletinTemplate()
-  return {
-    school: { name: db.school.name, shortName: db.school.shortName, city: db.school.city, year: db.school.settings.academicYear },
-    template: { ...tpl },
-    student: { id: row.student.id, name: `${row.student.lastName} ${row.student.firstName}`, matricule: row.student.matricule, email: row.student.email },
-    classe: calc.classe.name,
-    periode: { name: calc.periode.name, start: calc.periode.start, end: calc.periode.end },
-    lines: row.lines,
-    general: row.general, mention: row.mention,
-    rank: db.school.settings.showRank ? row.rank : null, effectif: calc.effectif,
-    classStats: calc.classStats,
-    appreciationGenerale: appreciationGenerale ?? appreciationFor(row.general),
-  }
-}
-
-const sameContent = (a, b) => {
-  const strip = (x) => JSON.stringify({ ...x, template: undefined })
-  return strip(a) === strip(b)
-}
-
-// GET /api/bulletins/preview?periodeId=&classeId=  (administrateur)
-export async function bulletinPreview(periodeId, classeId) {
-  await load()
-  requireUser('admin')
-  const calc = computeBulletins(periodeId, classeId)
+  const students = db.users
+    .filter((u) => u.role === 'student' && u.classeId === c.id && u.active)
+    .sort((x, y) => x.lastName.localeCompare(y.lastName) || x.firstName.localeCompare(y.firstName))
   return clone({
-    ...calc,
-    template: bulletinTemplate(),
-    showRank: !!db.school.settings.showRank,
-    rows: calc.rows.map((r) => {
-      const b = db.bulletins.find((x) => x.periodeId === calc.periode.id && x.studentId === r.student.id)
-      const snap = bulletinSnapshot(calc, r, b?.data.appreciationGenerale)
-      return {
-        ...r, student: publicUser(r.student),
-        bulletin: b ? { id: b.id, version: b.version, publishedAt: b.updatedAt, code: b.code, changed: !sameContent(b.data, snap) } : null,
-        preview: snap,
-      }
+    periode: p,
+    classe: { id: c.id, name: c.name },
+    rows: students.map((s) => {
+      const b = db.bulletins.find((x) => x.periodeId === p.id && x.studentId === s.id)
+      return { student: publicUser(s), bulletin: b ? bulletinInfo(b) : null }
     }),
   })
 }
 
-function verificationCode() {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
-  const part = () => Array.from(crypto.getRandomValues(new Uint32Array(4)), (n) => chars[n % chars.length]).join('')
-  let code
-  do { code = `ESA-${part()}-${part()}` } while (db.bulletins.some((b) => b.code === code))
-  return code
-}
-
-// POST /api/bulletins/publish  { periodeId, classeId, reason }
-export async function publishBulletins(periodeId, classeId, reason = '') {
+// Dépôt (ou remplacement) du bulletin d'un étudiant pour une période
+// file : { name, base64 } (contenu du fichier encodé en base64)
+export async function uploadBulletin(periodeId, studentId, file) {
   await load()
-  const actor = requireUser('admin')
-  const calc = computeBulletins(periodeId, classeId)
-  let created = 0
-  let updated = 0
-  for (const r of calc.rows) {
-    const existing = db.bulletins.find((b) => b.periodeId === calc.periode.id && b.studentId === r.student.id)
-    const snap = bulletinSnapshot(calc, r, existing?.data.appreciationGenerale)
-    if (!existing) {
-      db.bulletins.push({
-        id: nextId('bulletin'), schoolId: actor.schoolId, periodeId: calc.periode.id, classeId: calc.classe.id, studentId: r.student.id,
-        code: verificationCode(), version: 1, data: snap, publishedAt: now(), updatedAt: now(), publishedBy: actor.id, history: [],
-      })
-      notify(r.student.id, 'Bulletin disponible', `Votre bulletin du ${calc.periode.name} est publié.`, '/etudiant/resultats?onglet=bulletins')
-      created++
-    } else if (!sameContent(existing.data, snap)) {
-      if (!reason.trim()) throw new ApiError('Des bulletins déjà publiés vont changer : indiquez le motif de la modification.')
-      existing.history.push({ version: existing.version, data: existing.data, updatedAt: existing.updatedAt, by: existing.publishedBy })
-      existing.version += 1
-      existing.data = snap
-      existing.updatedAt = now()
-      existing.publishedBy = actor.id
-      existing.lastReason = reason.trim()
-      existing.history[existing.history.length - 1].replacedBecause = reason.trim()
-      notify(r.student.id, 'Bulletin mis à jour', `Votre bulletin du ${calc.periode.name} a été modifié (version ${existing.version}).`, '/etudiant/resultats?onglet=bulletins')
-      updated++
-    }
+  const actor = requireUser(...BULLETIN_STAFF)
+  const p = db.periodes.find((x) => x.id === Number(periodeId))
+  const s = db.users.find((u) => u.id === Number(studentId) && u.role === 'student')
+  if (!p) throw new ApiError('Période introuvable.')
+  if (!s) throw new ApiError('Étudiant introuvable.')
+  let bytes
+  try { bytes = decodeBase64(file?.base64) } catch { throw new ApiError('Fichier illisible.') }
+  if (!bytes.length) throw new ApiError('Le fichier est vide.')
+  if (bytes.length > BULLETIN_MAX_BYTES) throw new ApiError(`Fichier trop lourd (${(bytes.length / 1048576).toFixed(1)} Mo) : 2 Mo au maximum. Enregistrez le bulletin en PDF ou réduisez la qualité du scan.`)
+  const type = BULLETIN_TYPES.find((t) => t.magic.every((x, i) => bytes[i] === x))
+  if (!type) throw new ApiError('Format non accepté : déposez un PDF, un JPG ou un PNG.')
+  const key = await fileKey(bytes)
+  await platform.files.put(key, bytes)
+  const fileName = String(file?.name || `bulletin.${type.ext}`).replace(/[\\/:*?"<>|]+/g, '_').slice(0, 120)
+
+  const existing = db.bulletins.find((x) => x.periodeId === p.id && x.studentId === s.id)
+  if (existing) {
+    if (existing.fileKey !== key && !db.bulletins.some((x) => x !== existing && x.fileKey === existing.fileKey)) platform.files.remove(existing.fileKey)
+    Object.assign(existing, { classeId: s.classeId, fileKey: key, fileName, mime: type.mime, size: bytes.length, version: (existing.version || 1) + 1, uploadedAt: now(), uploadedBy: actor.id })
+  } else {
+    db.bulletins.push({
+      id: nextId('bulletin'), schoolId: actor.schoolId, periodeId: p.id, classeId: s.classeId, studentId: s.id,
+      fileKey: key, fileName, mime: type.mime, size: bytes.length, version: 1, uploadedAt: now(), uploadedBy: actor.id,
+    })
   }
-  audit(actor, 'publication_bulletins', `${calc.classe.name} - ${calc.periode.name}`, `${created} publié(s), ${updated} modifié(s)${reason ? ` - motif : ${reason}` : ''}`)
+  notify(s.id, existing ? 'Bulletin remplacé' : 'Bulletin disponible',
+    existing ? `Votre bulletin du ${p.name} a été remplacé par une nouvelle version.` : `Votre bulletin du ${p.name} est disponible.`,
+    '/etudiant/resultats?onglet=bulletins')
+  audit(actor, existing ? 'remplacement_bulletin' : 'depot_bulletin', `${s.lastName} ${s.firstName} (${s.matricule})`, `${p.name} - ${fileName}`)
   save()
-  return { created, updated }
+  return clone(bulletinInfo(db.bulletins.find((x) => x.periodeId === p.id && x.studentId === s.id)))
 }
 
-// PUT /api/bulletins/{id}/appreciation  { text, reason }
-export async function setBulletinAppreciation(bulletinId, text, reason) {
+export async function deleteBulletin(bulletinId) {
   await load()
-  const actor = requireUser('admin')
+  const actor = requireUser(...BULLETIN_STAFF)
   const b = db.bulletins.find((x) => x.id === Number(bulletinId))
   if (!b) throw new ApiError('Bulletin introuvable.', 'not_found', 404)
-  if (!text.trim()) throw new ApiError('L\'appréciation ne peut pas être vide.')
-  if (!reason?.trim()) throw new ApiError('Indiquez le motif de la modification : le bulletin est déjà publié.')
-  b.history.push({ version: b.version, data: b.data, updatedAt: b.updatedAt, by: b.publishedBy, replacedBecause: reason.trim() })
-  b.version += 1
-  b.data = { ...b.data, appreciationGenerale: text.trim() }
-  b.updatedAt = now()
-  b.publishedBy = actor.id
-  audit(actor, 'modification_bulletin', b.data.student.name, `version ${b.version} - motif : ${reason.trim()}`)
-  notify(b.studentId, 'Bulletin mis à jour', `Votre bulletin du ${b.data.periode.name} a été modifié (version ${b.version}).`, '/etudiant/resultats?onglet=bulletins')
+  db.bulletins = db.bulletins.filter((x) => x !== b)
+  if (!db.bulletins.some((x) => x.fileKey === b.fileKey)) platform.files.remove(b.fileKey)
+  const s = db.users.find((u) => u.id === b.studentId)
+  const p = db.periodes.find((x) => x.id === b.periodeId)
+  audit(actor, 'suppression_bulletin', s ? `${s.lastName} ${s.firstName} (${s.matricule})` : '', `${p?.name ?? ''} - ${b.fileName}`)
   save()
-  return clone(b)
 }
 
-// GET /api/bulletins/{id}  (administrateur, ou l'étudiant concerné)
-export async function getBulletin(bulletinId) {
+// Contenu du fichier : éducateurs et administration, ou l'étudiant concerné
+export async function getBulletinFile(bulletinId) {
   await load()
-  const user = requireUser('admin', 'student')
+  const user = requireUser(...BULLETIN_STAFF, 'student')
   const b = db.bulletins.find((x) => x.id === Number(bulletinId))
   if (!b || (user.role === 'student' && b.studentId !== user.id)) throw new ApiError('Bulletin introuvable.', 'not_found', 404)
-  const out = clone(b)
-  if (user.role === 'student') delete out.history // l'historique est réservé à l'administration
-  return out
+  const bytes = await platform.files.get(b.fileKey)
+  if (!bytes) throw new ApiError('Le fichier de ce bulletin est introuvable. Demandez à l\'établissement de le déposer à nouveau.', 'not_found', 404)
+  let bin = ''
+  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000))
+  return { fileName: b.fileName, mime: b.mime, base64: btoa(bin) }
 }
 
 // GET /api/student/bulletins
@@ -2064,65 +2082,13 @@ export async function studentBulletins() {
   await load()
   const user = requireUser('student')
   return db.bulletins.filter((b) => b.studentId === user.id)
-    .map((b) => ({ id: b.id, periode: b.data.periode.name, classe: b.data.classe, general: b.data.general, mention: b.data.mention, version: b.version, updatedAt: b.updatedAt, code: b.code }))
-    .sort((x, y) => (y.updatedAt > x.updatedAt ? 1 : -1))
-}
-
-// GET /api/public/verify/{code}  (sans connexion)
-export async function verifyBulletin(code) {
-  await load()
-  await wait(200)
-  const b = db.bulletins.find((x) => x.code === String(code).trim().toUpperCase())
-  if (!b) return null
-  return {
-    code: b.code, version: b.version, updatedAt: b.updatedAt,
-    school: b.data.school.name, student: b.data.student.name, matricule: b.data.student.matricule,
-    classe: b.data.classe, periode: b.data.periode.name, general: b.data.general, mention: b.data.mention,
-  }
-}
-
-// Notes saisies à la main (oral, TP papier...)
-export async function listManualGrades(periodeId, classeId) {
-  await load()
-  requireUser('admin')
-  return db.manualGrades
-    .filter((g) => g.periodeId === Number(periodeId) && g.classeId === Number(classeId))
-    .map((g) => ({ ...g, student: publicUser(db.users.find((u) => u.id === g.studentId))?.fullName ?? '', matiere: db.matieres.find((m) => m.id === g.matiereId)?.name ?? '' }))
-}
-
-export async function saveManualGrade(g) {
-  await load()
-  const actor = requireUser('admin')
-  const score = Number(String(g.score).replace(',', '.'))
-  if (!g.studentId || !g.matiereId || !g.label?.trim()) throw new ApiError('Étudiant, matière et intitulé sont obligatoires.')
-  if (Number.isNaN(score) || score < 0 || score > 20) throw new ApiError('La note doit être comprise entre 0 et 20.')
-  db.manualGrades.push({ id: nextId('manualGrade'), schoolId: actor.schoolId, periodeId: Number(g.periodeId), classeId: Number(g.classeId), studentId: Number(g.studentId), matiereId: Number(g.matiereId), label: g.label.trim(), score: round2(score), createdAt: now(), by: actor.id })
-  const s = db.users.find((u) => u.id === Number(g.studentId))
-  audit(actor, 'saisie_note', `${s?.firstName} ${s?.lastName}`, `${g.label.trim()} : ${round2(score)}/20`)
-  save()
-}
-
-export async function deleteManualGrade(id) {
-  await load()
-  const actor = requireUser('admin')
-  const g = db.manualGrades.find((x) => x.id === id)
-  db.manualGrades = db.manualGrades.filter((x) => x.id !== id)
-  if (g) audit(actor, 'suppression_note', g.label, `${g.score}/20`)
-  save()
-}
-
-export async function getBulletinTemplate() {
-  await load()
-  requireUser('admin')
-  return clone(bulletinTemplate())
-}
-
-export async function saveBulletinTemplate(tpl) {
-  await load()
-  const actor = requireUser('admin')
-  db.school.settings.bulletin = { ...bulletinTemplate(), ...tpl }
-  audit(actor, 'modification_modele_bulletin', 'Modèle de bulletin')
-  save()
+    .map((b) => ({
+      id: b.id,
+      periode: db.periodes.find((p) => p.id === b.periodeId)?.name ?? '',
+      classe: db.classes.find((c) => c.id === b.classeId)?.name ?? '',
+      fileName: b.fileName, mime: b.mime, size: b.size, version: b.version, uploadedAt: b.uploadedAt,
+    }))
+    .sort((x, y) => (y.uploadedAt > x.uploadedAt ? 1 : -1))
 }
 
 // Remise à zéro de la démo (bouton dans les paramètres)

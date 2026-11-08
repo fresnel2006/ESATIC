@@ -55,7 +55,8 @@ export function webDoc({ html = '', css = '', js = '' }, channel = 'x') {
 let channelSeq = 0
 
 // Aperçu façon navigateur, avec sa console
-export function WebPreview({ value, auto = true, height = 420, title = 'Aperçu' }) {
+// address : nom affiché dans la barre ; showConsole : console JavaScript sous la page (inutile pour PHP)
+export function WebPreview({ value, auto = true, height = 420, title = 'Aperçu', address = 'apercu/index.html', showConsole = true }) {
   const [channel] = useState(() => `p${++channelSeq}-${Math.random().toString(36).slice(2, 8)}`)
   const [shown, setShown] = useState(value)
   const [runId, setRunId] = useState(0)
@@ -115,7 +116,7 @@ export function WebPreview({ value, auto = true, height = 420, title = 'Aperçu'
   const bar = (onBig) => (
     <div className="web-bar">
       <span className="web-dots" aria-hidden="true"><i /><i /><i /></span>
-      <span className="web-url"><Globe size={13} strokeWidth={1.6} /> apercu/index.html</span>
+      <span className="web-url"><Globe size={13} strokeWidth={1.6} /> {address}</span>
       <button type="button" className="web-btn" onClick={refresh} title="Actualiser l'aperçu"><RotateCw size={14} strokeWidth={1.7} /> Actualiser</button>
       {onBig}
     </div>
@@ -125,7 +126,7 @@ export function WebPreview({ value, auto = true, height = 420, title = 'Aperçu'
     <div className="web-preview">
       {bar(<button type="button" className="web-btn" onClick={() => { setLogs([]); setBig(true) }} title="Agrandir l'aperçu"><Maximize2 size={14} strokeWidth={1.7} /></button>)}
       {frame(height, 'small')}
-      <div className="web-console">
+      {showConsole && <div className="web-console">
         <div className="web-console-head">
           <span>Console</span>
           {errors > 0 && <span className="web-err-count">{errors} erreur{errors > 1 ? 's' : ''}</span>}
@@ -136,7 +137,7 @@ export function WebPreview({ value, auto = true, height = 420, title = 'Aperçu'
           {logs.length === 0 && <div className="t-dim">Les messages de console.log() et les erreurs du script s'affichent ici.</div>}
           {logs.map((l, i) => <div key={i} className={`web-log ${l.level}`}>{l.text}</div>)}
         </div>
-      </div>
+      </div>}
       {big && createPortal(
         <div className="web-big" role="dialog" aria-label="Aperçu agrandi" onKeyDown={(e) => e.key === 'Escape' && setBig(false)}>
           <div className="web-big-box">

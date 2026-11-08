@@ -28,6 +28,9 @@ export const NAV = {
     { to: '/surveillant/alertes', label: 'Alertes', icon: BellRing, mobile: true },
     { to: '/surveillant/historique', label: 'Historique', icon: History, mobile: true },
   ],
+  educator: [
+    { to: '/educateur/bulletins', label: 'Bulletins', icon: FileBadge, mobile: true },
+  ],
   admin: [
     { to: '/admin', label: 'Tableau de bord', icon: LayoutDashboard, end: true, mobile: true },
     { to: '/admin/utilisateurs', label: 'Utilisateurs', icon: UserCog, mobile: true },

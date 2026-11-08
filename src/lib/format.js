@@ -78,6 +78,7 @@ export const ROLE_LABELS = {
   admin: 'Administrateur',
   teacher: 'Enseignant',
   proctor: 'Surveillant',
+  educator: 'Éducateur',
   student: 'Étudiant',
 }
 
@@ -85,6 +86,7 @@ export const ROLE_HOME = {
   admin: '/admin',
   teacher: '/enseignant',
   proctor: '/surveillant/sessions',
+  educator: '/educateur/bulletins',
   student: '/etudiant',
 }
 
@@ -103,22 +105,31 @@ export const LANGUAGES = {
   java: 'Java',
   javascript: 'JavaScript',
   php: 'PHP',
+  ocaml: 'OCaml',
+  algo: 'Pseudo-code (algorithme)',
 }
+
+// Langages qui s'écrivent sans jamais s'exécuter : corrigés par l'enseignant
+export const isWriteOnly = (lang) => !!TOOLS[lang]?.writeOnly
 
 // Outils informatiques qu'une matière peut utiliser (réglés par l'administrateur dans Structure > Matières).
 // `code` : langage proposé dans les questions de code ; `browser` : exécutable dans le navigateur en mode test ;
 // `server` : ce qu'il faut installer dans le bac à sable du serveur de correction.
 export const TOOLS = {
-  // C : interpréteur picoc dans le navigateur (C des cours ; gcc complet viendra avec le serveur d'exécution)
-  c: { label: 'C', code: true, browser: true, server: 'Compilateur gcc (pour le C avancé)' },
-  cpp: { label: 'C++', code: true, browser: false, server: 'Compilateur g++' },
-  java: { label: 'Java', code: true, browser: false, server: 'JDK 21 (javac et java)' },
+  // C : interpréteur picoc dans le navigateur (C des cours)
+  c: { label: 'C', code: true, browser: true, server: 'Rien : C de base exécuté dans le navigateur' },
+  // C++, Java, OCaml : écrits dans l'éditeur, sans exécution ; corrigés par l'enseignant
+  cpp: { label: 'C++', code: true, browser: false, server: 'Pas d\'exécution : code écrit, corrigé par l\'enseignant' },
+  java: { label: 'Java', code: true, browser: false, server: 'Pas d\'exécution : code écrit, corrigé par l\'enseignant' },
+  ocaml: { label: 'OCaml', code: true, browser: false, server: 'Pas d\'exécution : code écrit, corrigé par l\'enseignant' },
   python: { label: 'Python', code: true, browser: true, server: 'Python 3' },
   javascript: { label: 'JavaScript', code: true, browser: true, server: 'Node.js' },
   // PHP : vrai PHP 8.3 en WebAssembly dans le navigateur (environ 7 Mo téléchargés une fois)
   php: { label: 'PHP', code: true, browser: true, server: 'Rien : PHP 8.3 dans le navigateur' },
   sql: { label: 'SQL', code: false, browser: true, server: 'SQLite (bases de test)' },
   html: { label: 'Web (HTML, CSS, JS)', code: false, browser: true, server: 'Rien : aperçu en direct dans le navigateur' },
+  // Pseudo-code des cours d'algorithmique : écrit dans l'éditeur, jamais exécuté, corrigé par l'enseignant
+  algo: { label: 'Pseudo-code (algorithme)', code: true, browser: false, writeOnly: true, server: 'Rien : écrit seulement, corrigé par l\'enseignant' },
 }
 
 // Bases de test des questions SQL : assez pour un exercice, assez légères pour tout PC.
@@ -138,8 +149,10 @@ export const LANG_ENV = {
   c: { file: 'main.c', run: 'gcc main.c -o main && ./main' },
   cpp: { file: 'main.cpp', run: 'g++ main.cpp -o main && ./main' },
   java: { file: 'Main.java', run: 'javac Main.java && java Main' },
+  ocaml: { file: 'main.ml', run: 'ocaml main.ml' },
   php: { file: 'main.php', run: 'php main.php' },
   sql: { file: 'requete.sql', run: 'sqlite3 base_test.db < requete.sql' },
+  algo: { file: 'algorithme.txt', run: '' },
 }
 
 export const EVENT_LABELS = {
@@ -259,4 +272,7 @@ export const ACTION_LABELS = {
   saisie_note: 'Saisie de note (oral, TP papier)',
   suppression_note: 'Suppression de note saisie',
   modification_modele_bulletin: 'Modification du modèle de bulletin',
+  depot_bulletin: 'Dépôt de bulletin',
+  remplacement_bulletin: 'Remplacement de bulletin',
+  suppression_bulletin: 'Suppression de bulletin',
 }

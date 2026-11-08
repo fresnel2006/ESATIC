@@ -1,5 +1,5 @@
 ﻿import { useEffect, useState } from 'react'
-import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
+import { Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { Hash, Lock, GraduationCap, Eye, EyeOff, Loader2, FlaskConical } from 'lucide-react'
 import { useAuth } from '../context/AuthContext.jsx'
 import Logo from '../components/Logo.jsx'
@@ -127,7 +127,6 @@ export default function Login() {
             Mot de passe oublié, demander un<br />
             <button type="button" onClick={() => setForgot(true)}>nouveau mot de passe</button>
           </p>
-          <p className="auth-verify"><Link to="/verifier">Vérifier un bulletin</Link></p>
 
           {TEST_MODE.openTeacher && <TeacherTestAccess />}
 

@@ -1,8 +1,11 @@
 import { useSearchParams, useNavigate } from 'react-router-dom'
-import { ChartColumn, FileBadge } from 'lucide-react'
+import { useState } from 'react'
+import { ChartColumn, FileBadge, Eye, Download, Loader2 } from 'lucide-react'
 import * as api from '../../api/index.js'
 import { Empty, ErrorBox, Loader, ResponsiveTable, Tabs, useAsync } from '../../components/ui.jsx'
 import { fmtShort, fmtNote } from '../../lib/format.js'
+import { downloadBulletin, fmtSize, openBulletin } from '../../lib/bulletinFiles.js'
+import { useToast } from '../../context/ToastContext.jsx'
 
 export default function StudentResultats() {
   const [params, setParams] = useSearchParams()
@@ -58,24 +61,37 @@ export default function StudentResultats() {
   )
 }
 
+// Bulletins déposés par l'établissement : l'étudiant les ouvre ou les télécharge
 function BulletinsTab() {
-  const navigate = useNavigate()
+  const toast = useToast()
+  const [busy, setBusy] = useState(null)
   const { data, loading, error } = useAsync(() => api.studentBulletins(), [])
   if (error) return <ErrorBox error={error} />
   if (loading && !data) return <Loader />
+  const run = async (key, fn) => {
+    setBusy(key)
+    try { await fn() } catch (e) { toast.error(e.message) } finally { setBusy(null) }
+  }
   return (
     <div className="card">
       <ResponsiveTable
         rows={data}
-        onRowClick={(b) => navigate(`/etudiant/bulletins/${b.id}`)}
-        empty={<Empty icon={FileBadge} title="Aucun bulletin publié">Votre bulletin sera visible ici lorsque l'administration l'aura publié. Vous pourrez alors le télécharger en PDF.</Empty>}
+        empty={<Empty icon={FileBadge} title="Aucun bulletin pour le moment">Vos bulletins apparaîtront ici dès que l'établissement les aura déposés. Vous serez prévenu par une notification.</Empty>}
         columns={[
           { key: 'periode', label: 'Période', primary: true, render: (b) => <strong style={{ fontWeight: 600 }}>{b.periode}</strong> },
           { key: 'classe', label: 'Classe' },
-          { key: 'general', label: 'Moyenne générale', render: (b) => <strong>{fmtNote(b.general)}/20</strong> },
-          { key: 'mention', label: 'Mention' },
-          { key: 'updatedAt', label: 'Publié le', render: (b) => `${fmtShort(b.updatedAt)}${b.version > 1 ? ` (version ${b.version})` : ''}` },
-          { key: 'actions', label: '', className: 'actions', render: (b) => <button className="btn btn-primary btn-sm" onClick={(e) => { e.stopPropagation(); navigate(`/etudiant/bulletins/${b.id}`) }}>Consulter</button> },
+          { key: 'uploadedAt', label: 'Déposé le', render: (b) => `${fmtShort(b.uploadedAt)}${b.version > 1 ? ' (nouvelle version)' : ''}` },
+          { key: 'size', label: 'Fichier', hideMobile: true, render: (b) => <span className="small muted">{b.mime === 'application/pdf' ? 'PDF' : 'Image'}, {fmtSize(b.size)}</span> },
+          { key: 'actions', label: '', className: 'actions', render: (b) => (
+            <div className="row" style={{ gap: 6, justifyContent: 'flex-end' }}>
+              <button className="btn btn-secondary btn-sm" disabled={!!busy} onClick={() => run(`o${b.id}`, () => openBulletin(b.id))}>
+                {busy === `o${b.id}` ? <Loader2 size={14} className="spin" /> : <Eye size={14} />} Ouvrir
+              </button>
+              <button className="btn btn-primary btn-sm" disabled={!!busy} onClick={() => run(`d${b.id}`, () => downloadBulletin(b.id))}>
+                {busy === `d${b.id}` ? <Loader2 size={14} className="spin" /> : <Download size={14} />} Télécharger
+              </button>
+            </div>
+          ) },
         ]}
       />
     </div>
