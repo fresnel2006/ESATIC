@@ -868,3 +868,16 @@ h2, h3 { font-weight: 600; }
 /* Dépôt groupé des bulletins : fichiers ignorés ou en erreur */
 .bulk-list { margin: 4px 0 0; padding-left: 18px; max-height: 160px; overflow: auto; }
 .bulk-list li { margin: 2px 0; }
+
+/* Administration : classes et matières attribuées à un enseignant */
+.assign { display: grid; gap: 10px; margin-top: 4px; }
+.assign-current { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px; border: 1px solid var(--border); border-radius: 8px; min-height: 44px; align-items: center; }
+.assign-chip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 4px 3px 10px; border-radius: 999px; background: var(--primary-soft); font-size: 0.82rem; }
+.assign-chip button { display: inline-flex; border: 0; background: transparent; cursor: pointer; padding: 2px; border-radius: 999px; color: var(--text-2); }
+.assign-chip button:hover { background: rgba(0, 0, 0, 0.08); color: var(--danger, #b42318); }
+.assign-add { display: grid; gap: 10px; padding: 12px; border: 1px dashed var(--border-strong, var(--border)); border-radius: 8px; }
+.assign-levels { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }
+.assign-level { display: grid; gap: 4px; align-content: start; }
+.assign-level-head { text-align: left; border: 0; background: transparent; font-weight: 700; cursor: pointer; padding: 0 0 2px; color: var(--text); }
+.assign-level-head .muted { font-weight: 400; font-size: 0.75rem; margin-left: 4px; }
+@media (max-width: 760px) { .assign-levels { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

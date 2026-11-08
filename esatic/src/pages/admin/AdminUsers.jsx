@@ -6,20 +6,31 @@ import { useToast } from '../../context/ToastContext.jsx'
 import { useAuth } from '../../context/AuthContext.jsx'
 import { Avatar, Empty, ErrorBox, Loader, Modal, Notice, PageHead, ResponsiveTable, StatusBadge, useAsync, ICON } from '../../components/ui.jsx'
 import { ROLE_LABELS, downloadCsv, fmtDateTime, parseCsv } from '../../lib/format.js'
+import TeacherAssignments from '../../components/TeacherAssignments.jsx'
 
-function UserForm({ user, classes, onClose, onSaved }) {
+function UserForm({ user, structure, onClose, onSaved }) {
+  const { classes } = structure
   const [f, setF] = useState(user || { matricule: '', firstName: '', lastName: '', email: '', role: 'student', classeId: classes[0]?.id ?? '' })
+  // Enseignant : classes et matières attribuées
+  const [assign, setAssign] = useState(() => (structure.teaching || []).filter((t) => user && t.teacherId === user.id).map((t) => ({ classeId: t.classeId, matiereId: t.matiereId })))
   const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
   const [created, setCreated] = useState(null)
   const set = (p) => setF((x) => ({ ...x, ...p }))
+  const wasTeacher = user?.role === 'teacher'
 
   async function save() {
     setError('')
+    setBusy(true)
     try {
       const r = await api.saveUser(f)
+      const id = r.user?.id ?? user?.id
+      // Affectations enregistrées après le compte (un enseignant qui change de rôle les perd)
+      if (f.role === 'teacher') await api.setTeacherAssignments(id, assign)
+      else if (wasTeacher) await api.setTeacherAssignments(id, [])
       if (r.temporaryPassword) setCreated(r)
       else { onSaved(); onClose() }
-    } catch (e) { setError(e.message) }
+    } catch (e) { setError(e.message) } finally { setBusy(false) }
   }
 
   if (created) {
@@ -36,9 +47,9 @@ function UserForm({ user, classes, onClose, onSaved }) {
   }
 
   return (
-    <Modal title={user ? 'Modifier l\'utilisateur' : 'Nouvel utilisateur'} onClose={onClose} footer={<>
+    <Modal wide={f.role === 'teacher'} title={user ? 'Modifier l\'utilisateur' : 'Nouvel utilisateur'} onClose={onClose} footer={<>
       <button className="btn btn-secondary" onClick={onClose}>Annuler</button>
-      <button className="btn btn-primary" onClick={save}>{user ? 'Enregistrer' : 'Créer le compte'}</button>
+      <button className="btn btn-primary" disabled={busy} onClick={save}>{user ? 'Enregistrer' : 'Créer le compte'}</button>
     </>}>
       <div className="form-grid cols-2">
         <div className="field"><label htmlFor="u-mat">Matricule</label><input id="u-mat" className="input" value={f.matricule} onChange={(e) => set({ matricule: e.target.value })} /></div>
@@ -61,6 +72,13 @@ function UserForm({ user, classes, onClose, onSaved }) {
             <select id="u-cl" className="select" value={f.classeId ?? ''} onChange={(e) => set({ classeId: Number(e.target.value) })}>
               {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
+          </div>
+        )}
+        {f.role === 'teacher' && (
+          <div className="field span-2">
+            <label>Classes et matières attribuées</label>
+            <span className="hint">L'enseignant les retrouve dans « Mes classes ». Il peut aussi créer des épreuves pour les autres classes de l'école.</span>
+            <TeacherAssignments classes={classes} matieres={structure.matieres || []} value={assign} onChange={setAssign} />
           </div>
         )}
         {error && <div className="span-2"><Notice kind="danger">{error}</Notice></div>}
@@ -184,7 +202,7 @@ export default function AdminUsers() {
     if (params.get('nouveau') || params.get('import')) setParams({}, { replace: true })
   }, [params, setParams])
 
-  const [users, structure] = data || [[], { classes: [] }]
+  const [users, structure] = data || [[], { classes: [], matieres: [], teaching: [] }]
   const rows = users
     .filter((u) => (!role || u.role === role) && (!classe || u.classeId === Number(classe)))
     .filter((u) => !q || `${u.firstName} ${u.lastName} ${u.matricule} ${u.email}`.toLowerCase().includes(q.toLowerCase()))
@@ -227,7 +245,14 @@ export default function AdminUsers() {
               ) },
               { key: 'matricule', label: 'Matricule', render: (u) => <span className="mono nowrap">{u.matricule}</span> },
               { key: 'role', label: 'Rôle', render: (u) => ROLE_LABELS[u.role] },
-              { key: 'classe', label: 'Classe', render: (u) => (u.classe ? <span className="nowrap">{structure.classes.find((c) => c.id === u.classeId)?.code ?? u.classe}</span> : '-') },
+              { key: 'classe', label: 'Classe', render: (u) => {
+                if (u.role === 'teacher') {
+                  const names = [...new Set((structure.teaching || []).filter((t) => t.teacherId === u.id).map((t) => structure.classes.find((c) => c.id === t.classeId)?.name).filter(Boolean))]
+                  if (!names.length) return <button className="btn btn-ghost btn-sm" onClick={() => setEdit(u)}>Attribuer des classes</button>
+                  return <span className="small" title={names.join(', ')}>{names.slice(0, 3).join(', ')}{names.length > 3 ? ` +${names.length - 3}` : ''}</span>
+                }
+                return u.classe ? <span className="nowrap">{structure.classes.find((c) => c.id === u.classeId)?.code ?? u.classe}</span> : '-'
+              } },
               { key: 'lastLoginAt', label: 'Dernière connexion', render: (u) => (u.lastLoginAt ? <span className="nowrap">{fmtDateTime(u.lastLoginAt)}</span> : <span className="muted">Jamais</span>) },
               { key: 'active', label: 'État', render: (u) => (u.active ? (u.mustChangePassword ? <StatusBadge status="en_cours" label="Mot de passe provisoire" /> : <StatusBadge status="rendu" label="Actif" />) : <StatusBadge status="annule" label="Désactivé" />) },
               { key: 'actions', label: '', className: 'actions', render: (u) => (
@@ -245,7 +270,7 @@ export default function AdminUsers() {
           />
         </div>
       )}
-      {edit && <UserForm user={edit === 'new' ? null : edit} classes={structure.classes} onClose={() => setEdit(null)} onSaved={() => { toast.success('Utilisateur enregistré.'); reload() }} />}
+      {edit && <UserForm user={edit === 'new' ? null : edit} structure={structure} onClose={() => setEdit(null)} onSaved={() => { toast.success('Utilisateur enregistré.'); reload() }} />}
       {importing && <ImportModal classes={structure.classes} onClose={() => setImporting(false)} onDone={reload} />}
       {reset && (
         <Modal title="Réinitialiser le mot de passe" onClose={() => setReset(null)} footer={reset.temp

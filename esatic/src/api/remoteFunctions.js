@@ -11,6 +11,7 @@ export const REMOTE_FUNCTIONS = [
   'resetPassword',
   'getStructure',
   'saveStructureItem',
+  'setTeacherAssignments',
   'deleteStructureItem',
   'toolsOverview',
   'saveSettings',

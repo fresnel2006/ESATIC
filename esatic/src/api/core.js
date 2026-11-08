@@ -589,6 +589,34 @@ export async function saveUser(data) {
   return { user: publicUser(user), temporaryPassword: temp }
 }
 
+// PUT /api/users/{id}/teaching : classes et matières attribuées à un enseignant (remplace la liste entière).
+// assignments : [{ classeId, matiereId }]
+export async function setTeacherAssignments(teacherId, assignments = []) {
+  await load()
+  const actor = requireUser('admin')
+  const teacher = db.users.find((u) => u.id === Number(teacherId) && u.role === 'teacher')
+  if (!teacher) throw new ApiError('Enseignant introuvable.', 'not_found', 404)
+  const wanted = []
+  for (const x of Array.isArray(assignments) ? assignments : []) {
+    const classeId = Number(x?.classeId)
+    const matiereId = Number(x?.matiereId)
+    if (!db.classes.some((c) => c.id === classeId)) throw new ApiError('Une des classes choisies n\'existe plus. Rechargez la page.')
+    if (!db.matieres.some((m) => m.id === matiereId)) throw new ApiError('Une des matières choisies n\'existe plus. Rechargez la page.')
+    if (!wanted.some((w) => w.classeId === classeId && w.matiereId === matiereId)) wanted.push({ classeId, matiereId })
+  }
+  const before = db.teaching.filter((t) => t.teacherId === teacher.id)
+  const kept = before.filter((t) => wanted.some((w) => w.classeId === t.classeId && w.matiereId === t.matiereId))
+  const added = wanted.filter((w) => !before.some((t) => t.classeId === w.classeId && t.matiereId === w.matiereId))
+  if (kept.length === before.length && !added.length) return
+  db.teaching = [
+    ...db.teaching.filter((t) => t.teacherId !== teacher.id),
+    ...kept,
+    ...added.map((w) => ({ id: nextId('teaching'), schoolId: actor.schoolId, teacherId: teacher.id, classeId: w.classeId, matiereId: w.matiereId })),
+  ]
+  audit(actor, 'affectations_enseignant', `${teacher.firstName} ${teacher.lastName} (${teacher.matricule})`, `${wanted.length} affectation(s) : ${added.length} ajoutée(s), ${before.length - kept.length} retirée(s)`)
+  save()
+}
+
 // PATCH /api/users/{id}/active
 export async function setUserActive(userId, active) {
   await load()

@@ -273,6 +273,7 @@ export const ACTION_LABELS = {
   suppression_note: 'Suppression de note saisie',
   modification_modele_bulletin: 'Modification du modèle de bulletin',
   depot_bulletin: 'Dépôt de bulletin',
+  affectations_enseignant: 'Classes attribuées à un enseignant',
   remplacement_bulletin: 'Remplacement de bulletin',
   suppression_bulletin: 'Suppression de bulletin',
 }
