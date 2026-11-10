@@ -19,6 +19,7 @@ export const REMOTE_FUNCTIONS = [
   'saveUser',
   'setUserActive',
   'importStudents',
+  'importTeachers',
   'listAudit',
   'adminStats',
   'listAssessments',

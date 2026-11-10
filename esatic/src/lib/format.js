@@ -239,6 +239,7 @@ export const ACTION_LABELS = {
   activation_compte: 'Réactivation de compte',
   desactivation_compte: 'Désactivation de compte',
   import_etudiants: 'Import d\'étudiants',
+  import_enseignants: 'Import d\'enseignants',
   creation_classe: 'Création de classe',
   modification_classe: 'Modification de classe',
   suppression_classe: 'Suppression de classe',

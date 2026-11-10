@@ -87,7 +87,41 @@ function UserForm({ user, structure, onClose, onSaved }) {
   )
 }
 
-function ImportModal({ classes, onClose, onDone }) {
+// Import par fichier CSV : étudiants ou enseignants (chacun son modèle de fichier et ses vérifications)
+const IMPORTS = {
+  students: {
+    title: 'Importer des étudiants',
+    required: ['matricule', 'nom', 'prenom', 'classe'],
+    columns: [['matricule', 'Matricule'], ['nom', 'Nom'], ['prenom', 'Prénom'], ['classe', 'Classe'], ['email', 'Email']],
+    send: (rows) => api.importStudents(rows),
+    model: (classes) => [{ matricule: 'ETU25001', nom: 'Kouamé', prenom: 'Ange', email: 'ange.kouame@esatic.ci', classe: classes[0]?.code ?? '' }],
+    modelName: 'modele-import-etudiants.csv',
+    resultName: 'identifiants-provisoires-etudiants.csv',
+    result: (c) => ({ Matricule: c.matricule, Nom: c.nom, Prénom: c.prenom, 'Email institutionnel': c.email, Classe: c.classe, 'Mot de passe provisoire': c.motDePasseProvisoire }),
+  },
+  teachers: {
+    title: 'Importer des enseignants',
+    required: ['matricule', 'nom', 'prenom'],
+    columns: [['matricule', 'Matricule'], ['nom', 'Nom'], ['prenom', 'Prénom'], ['email', 'Email'], ['matiere', 'Matière'], ['classes', 'Classes']],
+    send: (rows) => api.importTeachers(rows),
+    model: (classes, matieres) => {
+      const m1 = matieres[0]?.code ?? ''
+      const m2 = matieres[1]?.code ?? m1
+      const c = (i) => classes[i]?.name ?? ''
+      return [
+        { matricule: 'ENS025', nom: 'Koffi', prenom: 'Serge', email: 'serge.koffi@esatic.ci', matiere: m1, classes: [c(0), c(1)].filter(Boolean).join(', ') },
+        { matricule: 'ENS025', nom: 'Koffi', prenom: 'Serge', email: 'serge.koffi@esatic.ci', matiere: m2, classes: c(5) || c(2) },
+        { matricule: 'ENS026', nom: 'Bamba', prenom: 'Mariam', email: '', matiere: '', classes: '' },
+      ]
+    },
+    modelName: 'modele-import-enseignants.csv',
+    resultName: 'identifiants-provisoires-enseignants.csv',
+    result: (c) => ({ Matricule: c.matricule, Nom: c.nom, Prénom: c.prenom, 'Email institutionnel': c.email, 'Mot de passe provisoire': c.motDePasseProvisoire, 'Classes attribuées': c.affectations }),
+  },
+}
+
+function ImportModal({ kind, classes, matieres, onClose, onDone }) {
+  const cfg = IMPORTS[kind]
   const [rows, setRows] = useState(null)
   const [fileName, setFileName] = useState('')
   const [result, setResult] = useState(null)
@@ -102,31 +136,42 @@ function ImportModal({ classes, onClose, onDone }) {
     setFileName(file.name)
     if (/\.xlsx?$/i.test(file.name)) {
       setRows(null)
-      setError('Dans Excel, utilisez « Enregistrer sous » puis « CSV (séparateur : point-virgule) », et importez ce fichier. L\'import .xlsx direct sera fait par le serveur.')
+      setError('Dans Excel, utilisez « Enregistrer sous » puis « CSV (séparateur : point-virgule) », et importez ce fichier.')
       return
     }
     const parsed = parseCsv(await file.text())
-    const missing = ['matricule', 'nom', 'prenom', 'classe'].filter((c) => !parsed.length || !(c in parsed[0]))
+    const missing = cfg.required.filter((c) => !parsed.length || !(c in parsed[0]))
     if (missing.length) { setRows(null); setError(`Colonnes manquantes : ${missing.join(', ')}.`); return }
     setRows(parsed)
   }
 
   // Envoi par paquets de 100 : une classe entière ou toute l'école, sans dépasser les limites du serveur.
   // Si un paquet échoue, les comptes déjà créés restent affichés avec leurs mots de passe provisoires.
+  // Enseignants : les lignes d'un même matricule restent dans le même paquet.
   async function run() {
     setBusy(true)
     setError('')
-    const total = { created: [], errors: [] }
+    const total = { created: [], updated: [], errors: [] }
     const numbered = rows.map((r, i) => ({ ...r, line: i + 2 }))
+    const packets = []
+    for (const r of numbered) {
+      const last = packets[packets.length - 1]
+      const sameTeacher = kind === 'teachers' && last && last.some((x) => String(x.matricule).trim().toUpperCase() === String(r.matricule).trim().toUpperCase())
+      if (last && (last.length < 100 || sameTeacher)) last.push(r)
+      else packets.push([r])
+    }
+    let done = 0
     try {
-      for (let i = 0; i < numbered.length; i += 100) {
-        setProgress(`${i} / ${numbered.length}`)
-        const r = await api.importStudents(numbered.slice(i, i + 100))
+      for (const packet of packets) {
+        setProgress(`${done} / ${numbered.length}`)
+        const r = await cfg.send(packet)
         total.created.push(...r.created)
+        total.updated.push(...(r.updated || []))
         total.errors.push(...r.errors)
+        done += packet.length
       }
     } catch (e) {
-      setError(`Import interrompu à la ligne ${total.created.length + total.errors.length + 2} : ${e.message} Les comptes déjà créés sont listés ci-dessous ; relancez l'import avec les lignes restantes.`)
+      setError(`Import interrompu à la ligne ${done + 2} : ${e.message} Les comptes déjà créés sont listés ci-dessous ; relancez l'import avec les lignes restantes.`)
     } finally {
       setResult(total)
       setProgress('')
@@ -136,9 +181,9 @@ function ImportModal({ classes, onClose, onDone }) {
   }
 
   return (
-    <Modal wide title="Importer des étudiants" onClose={onClose} footer={result
+    <Modal wide title={cfg.title} onClose={onClose} footer={result
       ? <>
-        {result.created.length > 0 && <button className="btn btn-secondary" onClick={() => downloadCsv('identifiants-provisoires.csv', result.created.map((c) => ({ Matricule: c.matricule, Nom: c.nom, Prénom: c.prenom, 'Email institutionnel': c.email, Classe: c.classe, 'Mot de passe provisoire': c.motDePasseProvisoire })))}><Download {...ICON} /> Télécharger les identifiants</button>}
+        {result.created.length > 0 && <button className="btn btn-secondary" onClick={() => downloadCsv(cfg.resultName, result.created.map(cfg.result))}><Download {...ICON} /> Télécharger les identifiants</button>}
         <button className="btn btn-primary" onClick={onClose}>Terminé</button>
       </>
       : <>
@@ -148,7 +193,16 @@ function ImportModal({ classes, onClose, onDone }) {
       {result ? (
         <div className="stack">
           {error && <Notice kind="danger">{error}</Notice>}
-          <Notice kind="success">{result.created.length} compte(s) créé(s). Téléchargez la liste des mots de passe provisoires maintenant : elle ne sera plus affichée.</Notice>
+          <Notice kind="success">
+            {result.created.length} compte(s) créé(s){kind === 'teachers' && result.updated.length ? `, ${result.updated.length} enseignant(s) déjà inscrit(s) complété(s)` : ''}.
+            {result.created.length > 0 && ' Téléchargez la liste des mots de passe provisoires maintenant : elle ne sera plus affichée.'}
+          </Notice>
+          {result.updated.length > 0 && (
+            <div className="small">
+              <b>Classes ajoutées à des enseignants déjà inscrits :</b>
+              <ul style={{ margin: '6px 0 0', paddingLeft: 18 }}>{result.updated.map((u) => <li key={u.line}>{u.nom} {u.prenom} ({u.matricule}) : {u.affectations}</li>)}</ul>
+            </div>
+          )}
           {result.errors.length > 0 && (
             <Notice kind="danger">
               {result.errors.length} ligne(s) ignorée(s) :
@@ -158,7 +212,15 @@ function ImportModal({ classes, onClose, onDone }) {
         </div>
       ) : (
         <div className="stack">
-          <p className="small">Fichier CSV avec les colonnes <span className="kbd">matricule</span> <span className="kbd">nom</span> <span className="kbd">prenom</span> <span className="kbd">classe</span> et <span className="kbd">email</span> (email institutionnel ; s'il est vide, il est attribué automatiquement : prenom.nom@esatic.ci). La classe est le code (par exemple {classes[0]?.code}) ou le nom exact.</p>
+          {kind === 'students' ? (
+            <p className="small">Fichier CSV avec les colonnes <span className="kbd">matricule</span> <span className="kbd">nom</span> <span className="kbd">prenom</span> <span className="kbd">classe</span> et <span className="kbd">email</span> (email institutionnel ; s'il est vide, il est attribué automatiquement : prenom.nom@esatic.ci). La classe est le code (par exemple {classes[0]?.code}) ou le nom exact.</p>
+          ) : (
+            <p className="small">
+              Fichier CSV avec les colonnes <span className="kbd">matricule</span> <span className="kbd">nom</span> <span className="kbd">prenom</span> <span className="kbd">email</span>, et si vous le souhaitez <span className="kbd">matiere</span> et <span className="kbd">classes</span> pour attribuer ses classes en même temps.
+              La matière est le code (par exemple {matieres[0]?.code}) ou le nom exact ; <span className="kbd">classes</span> contient une ou plusieurs classes séparées par des virgules (par exemple « SRIT 2 A, M1 SIGL »).
+              Pour plusieurs matières, mettez une ligne par matière avec le même matricule. Un enseignant déjà inscrit garde son compte : seules ses nouvelles classes sont ajoutées.
+            </p>
+          )}
           <div className="row-wrap">
             <label className="btn btn-secondary">
               <FileSpreadsheet {...ICON} /> Choisir un fichier
@@ -166,7 +228,7 @@ function ImportModal({ classes, onClose, onDone }) {
             </label>
             <span className="small muted">{fileName || 'Aucun fichier choisi'}</span>
             <div className="spacer" />
-            <button className="btn btn-ghost btn-sm" onClick={() => downloadCsv('modele-import-etudiants.csv', [{ matricule: 'ETU25001', nom: 'Kouamé', prenom: 'Ange', email: 'ange.kouame@esatic.ci', classe: classes[0]?.code ?? '' }])}><Download size={14} /> Modèle CSV</button>
+            <button className="btn btn-ghost btn-sm" onClick={() => downloadCsv(cfg.modelName, cfg.model(classes, matieres))}><Download size={14} /> Modèle CSV</button>
           </div>
           {error && <Notice kind="danger">{error}</Notice>}
           {rows && (
@@ -174,8 +236,8 @@ function ImportModal({ classes, onClose, onDone }) {
               <p className="small muted">Aperçu : {rows.length} ligne(s)</p>
               <div className="table-wrap" style={{ maxHeight: 260, overflow: 'auto', border: '1px solid var(--border)', borderRadius: 8 }}>
                 <table className="table">
-                  <thead><tr><th>Matricule</th><th>Nom</th><th>Prénom</th><th>Classe</th><th>Email</th></tr></thead>
-                  <tbody>{rows.slice(0, 50).map((r, i) => <tr key={i}><td>{r.matricule}</td><td>{r.nom}</td><td>{r.prenom}</td><td>{r.classe}</td><td>{r.email}</td></tr>)}</tbody>
+                  <thead><tr>{cfg.columns.map(([, label]) => <th key={label}>{label}</th>)}</tr></thead>
+                  <tbody>{rows.slice(0, 50).map((r, i) => <tr key={i}>{cfg.columns.map(([key]) => <td key={key}>{r[key]}</td>)}</tr>)}</tbody>
                 </table>
               </div>
             </>
@@ -195,7 +257,7 @@ export default function AdminUsers() {
   const [role, setRole] = useState('')
   const [classe, setClasse] = useState('')
   const [edit, setEdit] = useState(params.get('nouveau') ? 'new' : null)
-  const [importing, setImporting] = useState(!!params.get('import'))
+  const [importing, setImporting] = useState(params.get('import') ? 'students' : null) // 'students' | 'teachers'
   const [reset, setReset] = useState(null)
 
   useEffect(() => {
@@ -214,7 +276,8 @@ export default function AdminUsers() {
         title="Utilisateurs"
         subtitle="Aucun compte ne se crée librement : tout passe par l'administration"
         actions={<>
-          <button className="btn btn-secondary" onClick={() => setImporting(true)}><Upload {...ICON} /> Importer (CSV)</button>
+          <button className="btn btn-secondary" onClick={() => setImporting('students')}><Upload {...ICON} /> Importer des étudiants (CSV)</button>
+          <button className="btn btn-secondary" onClick={() => setImporting('teachers')}><Upload {...ICON} /> Importer des enseignants (CSV)</button>
           <button className="btn btn-primary" onClick={() => setEdit('new')}><UserPlus {...ICON} /> Nouvel utilisateur</button>
         </>}
       />
@@ -271,7 +334,7 @@ export default function AdminUsers() {
         </div>
       )}
       {edit && <UserForm user={edit === 'new' ? null : edit} structure={structure} onClose={() => setEdit(null)} onSaved={() => { toast.success('Utilisateur enregistré.'); reload() }} />}
-      {importing && <ImportModal classes={structure.classes} onClose={() => setImporting(false)} onDone={reload} />}
+      {importing && <ImportModal key={importing} kind={importing} classes={structure.classes} matieres={structure.matieres || []} onClose={() => setImporting(null)} onDone={reload} />}
       {reset && (
         <Modal title="Réinitialiser le mot de passe" onClose={() => setReset(null)} footer={reset.temp
           ? <button className="btn btn-primary" onClick={() => setReset(null)}>Fermer</button>

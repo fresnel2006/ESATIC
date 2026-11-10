@@ -686,6 +686,79 @@ export async function importStudents(rows) {
   return { created, errors }
 }
 
+// POST /api/users/import-teachers : enseignants par fichier CSV.
+// Colonnes : matricule, nom, prenom, email (facultatif), matiere et classes (facultatives : ses affectations).
+// classes : plusieurs classes séparées par des virgules (code ou nom exact), par exemple « SRIT 2 A, M1 SIGL ».
+// Un même enseignant peut figurer sur plusieurs lignes (une par matière). Un enseignant déjà inscrit garde son
+// compte : seules ses nouvelles affectations sont ajoutées.
+export async function importTeachers(rows) {
+  await load()
+  const actor = requireUser('admin')
+  if (!Array.isArray(rows)) throw new ApiError('Fichier d\'import illisible.')
+  const created = []
+  const updated = []
+  const errors = []
+  const text = (v) => (v === undefined || v === null ? '' : String(v)).trim()
+  const same = (a, b) => a.toLowerCase() === b.toLowerCase()
+  const createdNow = new Map() // matricule -> ligne du résultat (comptes créés par ce fichier)
+  for (const [i, raw] of rows.entries()) {
+    const line = Number(raw?.line) || i + 2
+    const r = { matricule: text(raw?.matricule).toUpperCase(), nom: text(raw?.nom), prenom: text(raw?.prenom), email: text(raw?.email), matiere: text(raw?.matiere), classes: text(raw?.classes || raw?.classe) }
+    if (!r.matricule || !r.nom || !r.prenom) { errors.push({ line, message: 'matricule, nom ou prénom manquant' }); continue }
+
+    // Affectations de la ligne (matière + classes), vérifiées avant de toucher aux comptes
+    let matiere = null
+    let classes = []
+    if (r.matiere || r.classes) {
+      matiere = db.matieres.find((m) => same(m.code, r.matiere) || same(m.name, r.matiere))
+      if (!matiere) { errors.push({ line, message: `matière « ${r.matiere} » inconnue (code ou nom exact)` }); continue }
+      const names = r.classes.split(/[,|]/).map((x) => x.trim()).filter(Boolean)
+      if (!names.length) { errors.push({ line, message: 'matière indiquée sans classe' }); continue }
+      const unknown = names.filter((n) => !db.classes.some((c) => same(c.code, n) || same(c.name, n)))
+      if (unknown.length) { errors.push({ line, message: `classe${unknown.length > 1 ? 's' : ''} inconnue${unknown.length > 1 ? 's' : ''} : ${unknown.join(', ')}` }); continue }
+      classes = names.map((n) => db.classes.find((c) => same(c.code, n) || same(c.name, n)))
+    }
+
+    let user = db.users.find((u) => u.matricule.toUpperCase() === r.matricule)
+    if (user && user.role !== 'teacher') { errors.push({ line, message: `matricule ${r.matricule} déjà utilisé par un compte ${user.role === 'student' ? 'étudiant' : 'non enseignant'}` }); continue }
+    if (!user) {
+      const email = r.email || institutionalEmail(r.prenom, r.nom)
+      if (!EMAIL_RE.test(email)) { errors.push({ line, message: `email « ${email} » invalide` }); continue }
+      if (db.users.some((u) => u.email.toLowerCase() === email.toLowerCase())) { errors.push({ line, message: `email ${email} déjà utilisé` }); continue }
+      const temp = generatePassword()
+      user = {
+        id: nextId('user'), schoolId: actor.schoolId, role: 'teacher', matricule: r.matricule,
+        firstName: r.prenom, lastName: r.nom, email, classeId: null,
+        passwordHash: await platform.hash(temp), mustChangePassword: true, active: true,
+        createdAt: now(), lastLoginAt: null, activeToken: null,
+      }
+      db.users.push(user)
+      const out = { matricule: r.matricule, nom: user.lastName, prenom: user.firstName, email, motDePasseProvisoire: temp, affectations: [] }
+      created.push(out)
+      createdNow.set(r.matricule, out)
+    }
+    // Affectations ajoutées (sans doublon)
+    const added = []
+    for (const c of classes) {
+      if (db.teaching.some((t) => t.teacherId === user.id && t.classeId === c.id && t.matiereId === matiere.id)) continue
+      db.teaching.push({ id: nextId('teaching'), schoolId: actor.schoolId, teacherId: user.id, classeId: c.id, matiereId: matiere.id })
+      added.push(`${c.name} (${matiere.name})`)
+    }
+    const fresh = createdNow.get(r.matricule)
+    if (fresh) fresh.affectations.push(...added)
+    else if (added.length) updated.push({ line, matricule: r.matricule, nom: user.lastName, prenom: user.firstName, affectations: added })
+  }
+  if (created.length || updated.length) {
+    audit(actor, 'import_enseignants', `${created.length} compte(s) créé(s), ${updated.length} enseignant(s) complété(s)`, errors.length ? `${errors.length} ligne(s) rejetée(s)` : '')
+  }
+  save()
+  return {
+    created: created.map((c) => ({ ...c, affectations: c.affectations.join(', ') })),
+    updated: updated.map((u) => ({ ...u, affectations: u.affectations.join(', ') })),
+    errors,
+  }
+}
+
 // GET /api/audit
 export async function listAudit() {
   await load()
