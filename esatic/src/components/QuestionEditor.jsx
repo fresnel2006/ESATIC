@@ -2,7 +2,7 @@
 import { lazy, Suspense, useState } from 'react'
 import { Plus, Trash2, ArrowUp, ArrowDown, Copy, EyeOff, Eye } from 'lucide-react'
 import { ICON, Loader, Notice } from './ui.jsx'
-import { isWriteOnly, DIAGRAM_NOTATIONS, LANGUAGES, QUESTION_TYPES } from '../lib/format.js'
+import { isWriteOnly, LANGUAGES, QUESTION_TYPES } from '../lib/format.js'
 import { isEmptyDiagram } from './DiagramEditor.jsx'
 import { useExecution } from '../lib/useExecution.js'
 import SqlTestDatabase from './SqlTestDatabase.jsx'
@@ -35,7 +35,7 @@ function baseQuestion(type) {
   if (type === 'sql') { base.points = 4; base.data = { schemaSql: '', seedSql: '', expectedQuery: '', orderMatters: false } }
   if (type === 'diagram') {
     base.points = 6
-    base.data = { notation: 'merise', starterXml: '', answerModelXml: '' }
+    base.data = { starterXml: '', answerModelXml: '' }
   }
   if (type === 'html') {
     base.points = 6
@@ -266,17 +266,13 @@ export default function QuestionEditor({ q, index, total, onChange, onRemove, on
 
         {q.type === 'diagram' && (
           <div className="stack-sm">
-            <Field label="Formes proposées à l'étudiant" hint="L'étudiant peut toujours ajouter d'autres formes. Les cardinalités (0,1, 1,1, 0,n, 1,n) s'écrivent sur les liens.">
-              <select className="select" value={q.data.notation || 'libre'} onChange={(e) => setData({ notation: e.target.value })} style={{ maxWidth: 320 }}>
-                {Object.entries(DIAGRAM_NOTATIONS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-              </select>
-            </Field>
+            <span className="hint">L'étudiant a toujours les formes Merise, Relation d'entité et UML. Les cardinalités (0,1, 1,1, 0,n, 1,n) s'écrivent sur les liens.</span>
             <DiagramDetails title={`Diagramme de départ donné à l'étudiant (facultatif)${isEmptyDiagram(q.data.starterXml) ? '' : ' : rempli'}`}>
               <span className="hint">Par exemple quelques entités déjà placées, à compléter. Laissez vide pour une page blanche.</span>
-              <DiagramEditor key={`s-${q.id}-${q.data.notation}`} value={q.data.starterXml} notation={q.data.notation} onChange={(xml) => setData({ starterXml: xml })} height={460} title="Diagramme de départ" />
+              <DiagramEditor key={`s-${q.id}`} value={q.data.starterXml} onChange={(xml) => setData({ starterXml: xml })} height={460} title="Diagramme de départ" />
             </DiagramDetails>
             <DiagramDetails title={`Corrigé type, visible seulement par les correcteurs (facultatif)${isEmptyDiagram(q.data.answerModelXml) ? '' : ' : rempli'}`}>
-              <DiagramEditor key={`c-${q.id}-${q.data.notation}`} value={q.data.answerModelXml} notation={q.data.notation} onChange={(xml) => setData({ answerModelXml: xml })} height={460} title="Corrigé type" />
+              <DiagramEditor key={`c-${q.id}`} value={q.data.answerModelXml} onChange={(xml) => setData({ answerModelXml: xml })} height={460} title="Corrigé type" />
             </DiagramDetails>
             <Notice>Correction à la main : l'enseignant voit le diagramme de chaque étudiant et, s'il est rempli, le corrigé type à côté.</Notice>
           </div>

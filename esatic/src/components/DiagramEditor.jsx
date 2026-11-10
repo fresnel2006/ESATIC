@@ -31,23 +31,23 @@ const MERISE = [
   box('TABLE (MLD)', ['<u>id_table</u>', '#id_autre_table', 'attribut']),
 ]
 
-const LIBRARIES = {
-  merise: 'merise;er',
-  uml: 'uml',
-  libre: 'merise;uml;er;general',
+// Toujours les mêmes bibliothèques, dans cet ordre, pour toute question de modélisation :
+// Merise, Relation d'entité, UML (plus le Bloc-notes de draw.io)
+const LIBRARIES = 'merise;er;uml'
+
+// draw.io garde ses réglages (bibliothèques ouvertes...) dans le navigateur : réglages propres à la plateforme,
+// remis à zéro à chaque ouverture, pour que l'éditeur se présente toujours de la même façon.
+const SETTINGS_NAME = 'esatic-modelisation'
+function resetSettings() {
+  try {
+    for (const k of ['modelisation', 'merise', 'uml', 'libre']) localStorage.removeItem(`.esatic-${k}-config`)
+  } catch { /* stockage indisponible */ }
 }
 
-// draw.io garde ses réglages (bibliothèques ouvertes...) dans le navigateur. Un nom de réglages par notation,
-// remis à zéro à chaque ouverture : chaque question s'ouvre avec les formes choisies par l'enseignant.
-const settingsName = (notation) => `esatic-${LIBRARIES[notation] ? notation : 'libre'}`
-function resetSettings(notation) {
-  try { localStorage.removeItem(`.${settingsName(notation)}-config`) } catch { /* stockage indisponible */ }
-}
-
-function config(notation) {
+function config() {
   return {
-    settingsName: settingsName(notation),
-    defaultLibraries: LIBRARIES[notation] || LIBRARIES.libre,
+    settingsName: SETTINGS_NAME,
+    defaultLibraries: LIBRARIES,
     enabledLibraries: ['merise', 'uml', 'er', 'general', 'basic', 'arrows2', 'flowchart'],
     libraries: [{
       title: { main: 'ESATIC' },
@@ -63,7 +63,7 @@ const PARAMS = 'embed=1&proto=json&spin=1&ui=kennedy&lang=fr&libraries=1&configu
 export const isEmptyDiagram = (xml) => !xml || !/<mxCell[^>]*\s(vertex|edge)="1"/.test(xml)
 
 // value : XML du diagramme ; onChange(xml) à chaque modification (« » si le diagramme est vide)
-export default function DiagramEditor({ value, onChange, notation = 'libre', readOnly = false, height = 560, title = 'Éditeur de diagrammes' }) {
+export default function DiagramEditor({ value, onChange, readOnly = false, height = 560, title = 'Éditeur de diagrammes' }) {
   const frame = useRef(null)
   const [ready, setReady] = useState(false)
   const first = useRef(value) // contenu chargé à l'ouverture ; ensuite, c'est l'éditeur qui fait foi
@@ -76,14 +76,14 @@ export default function DiagramEditor({ value, onChange, notation = 'libre', rea
       let msg
       try { msg = JSON.parse(e.data) } catch { return }
       const send = (m) => frame.current?.contentWindow?.postMessage(JSON.stringify(m), '*')
-      if (msg.event === 'configure') { resetSettings(notation); send({ action: 'configure', config: config(notation) }) }
+      if (msg.event === 'configure') { resetSettings(); send({ action: 'configure', config: config() }) }
       else if (msg.event === 'init') send({ action: 'load', xml: first.current || '', autosave: readOnly ? 0 : 1, noExitBtn: 1 })
       else if (msg.event === 'load') setReady(true)
       else if (msg.event === 'autosave' && !readOnly) cb.current?.(isEmptyDiagram(msg.xml) ? '' : msg.xml)
     }
     window.addEventListener('message', onMessage)
     return () => window.removeEventListener('message', onMessage)
-  }, [notation, readOnly])
+  }, [readOnly])
 
   const src = `/drawio/index.html?${PARAMS}${readOnly ? '&chrome=0&nav=1' : ''}`
   return (

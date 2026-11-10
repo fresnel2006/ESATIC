@@ -99,12 +99,6 @@ export const QUESTION_TYPES = {
   diagram: 'Modélisation (UML, Merise)',
 }
 
-// Questions de modélisation : bibliothèques de formes proposées à l'étudiant
-export const DIAGRAM_NOTATIONS = {
-  merise: 'Merise (MCD, MLD)',
-  uml: 'UML',
-  libre: 'UML et Merise',
-}
 // Taille maximale d'un diagramme (XML draw.io), pour garder les copies légères
 export const DIAGRAM_MAX_KB = 300
 
