@@ -1,5 +1,5 @@
 // Éditeur d'une question (assistant de création et banque de questions)
-import { lazy, Suspense } from 'react'
+import { lazy, Suspense, useState } from 'react'
 import { Plus, Trash2, ArrowUp, ArrowDown, Copy, EyeOff, Eye } from 'lucide-react'
 import { ICON, Loader, Notice } from './ui.jsx'
 import { isWriteOnly, DIAGRAM_NOTATIONS, LANGUAGES, QUESTION_TYPES } from '../lib/format.js'
@@ -71,6 +71,18 @@ Fin
 `,
 }
 
+// Partie repliable avec un éditeur de diagrammes : l'éditeur n'est chargé qu'à l'ouverture
+// (sinon il se charge caché et prend le clavier pendant que l'enseignant écrit l'énoncé)
+function DiagramDetails({ title, children }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <details className="diagram-details" open={open} onToggle={(e) => setOpen(e.currentTarget.open)}>
+      <summary>{title}</summary>
+      {open && <Suspense fallback={<Loader label="Chargement de l'éditeur..." />}>{children}</Suspense>}
+    </details>
+  )
+}
+
 function Field({ label, hint, children }) {
   return (
     <div className="field">
@@ -120,7 +132,7 @@ export default function QuestionEditor({ q, index, total, onChange, onRemove, on
       </div>
       <div className="q-card-body">
         <Field label="Énoncé" hint="Entourez le code en ligne avec des accents graves, par exemple `int *p`.">
-          <textarea className="textarea" value={q.statement} onChange={(e) => set({ statement: e.target.value })} placeholder="Énoncé de la question" />
+          <textarea id={`q-statement-${q.id}`} className="textarea" value={q.statement} onChange={(e) => set({ statement: e.target.value })} placeholder="Énoncé de la question" />
         </Field>
 
         {q.type === 'qcm' && (
@@ -259,19 +271,13 @@ export default function QuestionEditor({ q, index, total, onChange, onRemove, on
                 {Object.entries(DIAGRAM_NOTATIONS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
               </select>
             </Field>
-            <details className="diagram-details">
-              <summary>Diagramme de départ donné à l'étudiant (facultatif){isEmptyDiagram(q.data.starterXml) ? '' : ' : rempli'}</summary>
+            <DiagramDetails title={`Diagramme de départ donné à l'étudiant (facultatif)${isEmptyDiagram(q.data.starterXml) ? '' : ' : rempli'}`}>
               <span className="hint">Par exemple quelques entités déjà placées, à compléter. Laissez vide pour une page blanche.</span>
-              <Suspense fallback={<Loader label="Chargement de l'éditeur..." />}>
-                <DiagramEditor key={`s-${q.id}-${q.data.notation}`} value={q.data.starterXml} notation={q.data.notation} onChange={(xml) => setData({ starterXml: xml })} height={460} title="Diagramme de départ" />
-              </Suspense>
-            </details>
-            <details className="diagram-details">
-              <summary>Corrigé type, visible seulement par les correcteurs (facultatif){isEmptyDiagram(q.data.answerModelXml) ? '' : ' : rempli'}</summary>
-              <Suspense fallback={<Loader label="Chargement de l'éditeur..." />}>
-                <DiagramEditor key={`c-${q.id}-${q.data.notation}`} value={q.data.answerModelXml} notation={q.data.notation} onChange={(xml) => setData({ answerModelXml: xml })} height={460} title="Corrigé type" />
-              </Suspense>
-            </details>
+              <DiagramEditor key={`s-${q.id}-${q.data.notation}`} value={q.data.starterXml} notation={q.data.notation} onChange={(xml) => setData({ starterXml: xml })} height={460} title="Diagramme de départ" />
+            </DiagramDetails>
+            <DiagramDetails title={`Corrigé type, visible seulement par les correcteurs (facultatif)${isEmptyDiagram(q.data.answerModelXml) ? '' : ' : rempli'}`}>
+              <DiagramEditor key={`c-${q.id}-${q.data.notation}`} value={q.data.answerModelXml} notation={q.data.notation} onChange={(xml) => setData({ answerModelXml: xml })} height={460} title="Corrigé type" />
+            </DiagramDetails>
             <Notice>Correction à la main : l'enseignant voit le diagramme de chaque étudiant et, s'il est rempli, le corrigé type à côté.</Notice>
           </div>
         )}

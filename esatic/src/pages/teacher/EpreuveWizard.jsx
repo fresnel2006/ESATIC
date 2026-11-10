@@ -160,6 +160,22 @@ export default function EpreuveWizard() {
     setStep(n)
   }
 
+  // Depuis l'aperçu (lecture seule) : retour à l'étape Questions, sur le champ à remplir
+  function goToQuestion(qid) {
+    setError('')
+    setStep(2)
+    setTimeout(() => {
+      const el = document.getElementById(`q-statement-${qid}`)
+      el?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+      el?.focus()
+    }, 200)
+  }
+  // Erreur du serveur « Question N : ... » : la question concernée (numérotée dans l'ordre de l'épreuve)
+  const errorQuestion = (() => {
+    const m = /^Question (\d+)/.exec(error || '')
+    return m && step === STEPS.length - 1 ? a.questions[Number(m[1]) - 1] : null
+  })()
+
   async function persist(publish) {
     setBusy(true)
     setError('')
@@ -492,7 +508,12 @@ export default function EpreuveWizard() {
                 <div className="q-card">
                   <div className="q-card-head"><span className="q-num">Question {n}</span><span className="tag">{QUESTION_TYPES[q.type]}</span><div className="spacer" /><span className="small">{q.points} pts</span></div>
                   <div className="q-card-body">
-                    {q.statement ? <Statement text={q.statement} /> : <span className="muted">Énoncé vide</span>}
+                    {q.statement ? <Statement text={q.statement} /> : (
+                      <div className="row-wrap">
+                        <span className="muted">Énoncé vide : il s'écrit à l'étape Questions (cet aperçu ne se modifie pas).</span>
+                        <button className="btn btn-secondary btn-sm" onClick={() => goToQuestion(q.id)}>Écrire l'énoncé</button>
+                      </div>
+                    )}
                     {q.type === 'qcm' && <ul style={{ margin: 0 }}>{q.data.choices.map((c) => <li key={c.id}>{c.text || <span className="muted">Choix vide</span>}{q.data.correct.includes(c.id) && <span className="badge badge-success badge-plain" style={{ marginLeft: 8 }}>Bonne réponse</span>}</li>)}</ul>}
                     {q.type === 'code' && <span className="small muted">{LANGUAGES[q.data.language]} - {q.data.tests.length} test(s) dont {q.data.tests.filter((t) => t.hidden).length} caché(s)</span>}
                   </div>
@@ -505,7 +526,14 @@ export default function EpreuveWizard() {
           </div>
         )}
 
-        {error && <Notice kind="danger">{error}</Notice>}
+        {error && (
+          <Notice kind="danger">
+            <div className="row-wrap" style={{ justifyContent: 'space-between' }}>
+              <span>{error}</span>
+              {errorQuestion && <button className="btn btn-secondary btn-sm" onClick={() => goToQuestion(errorQuestion.id)}>Corriger cette question</button>}
+            </div>
+          </Notice>
+        )}
       </div></div>
 
       <div className="wizard-foot">
