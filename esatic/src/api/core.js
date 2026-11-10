@@ -216,6 +216,17 @@ function migrate() {
   if (changed) save()
 }
 
+// Classes concernées par une épreuve : une ou plusieurs (classeIds). Les épreuves créées avant n'ont que classeId.
+export function classIdsOf(a) {
+  if (Array.isArray(a?.classeIds) && a.classeIds.length) return a.classeIds.map(Number)
+  return a?.classeId ? [Number(a.classeId)] : []
+}
+const classNamesOf = (a) => classIdsOf(a).map((id) => db.classes.find((c) => c.id === id)?.name).filter(Boolean).join(', ')
+const studentsOf = (a) => {
+  const ids = classIdsOf(a)
+  return db.users.filter((u) => u.role === 'student' && ids.includes(u.classeId))
+}
+
 // Langages de programmation utilisés par une liste de questions
 export function languagesOf(questions = []) {
   return [...new Set(questions.filter((q) => q.type === 'code').map((q) => q.data?.language).filter(Boolean))]
@@ -491,7 +502,7 @@ export async function deleteStructureItem(kind, id) {
   if (kind === 'classes' && db.users.some((u) => u.classeId === id)) {
     throw new ApiError('Impossible de supprimer une classe qui contient des étudiants.')
   }
-  if (kind === 'classes' && db.assessments.some((a) => a.classeId === id)) {
+  if (kind === 'classes' && db.assessments.some((a) => classIdsOf(a).includes(id))) {
     throw new ApiError('Impossible de supprimer une classe liée à des épreuves.')
   }
   if (kind === 'matieres' && db.assessments.some((a) => a.matiereId === id)) {
@@ -713,7 +724,8 @@ function decorateAssessment(a) {
   return {
     ...a,
     matiere: db.matieres.find((m) => m.id === a.matiereId)?.name ?? '',
-    classe: db.classes.find((c) => c.id === a.classeId)?.name ?? '',
+    classe: classNamesOf(a),
+    classeIds: classIdsOf(a),
     teacher: publicUser(db.users.find((u) => u.id === a.teacherId))?.fullName ?? '',
     maxPoints: maxPoints(a),
     questionCount: (a.questions || []).length,
@@ -747,7 +759,7 @@ export async function listAssessments() {
       ...decorateAssessment(a),
       submitted: atts.filter((t) => t.status !== 'en_cours').length,
       toGrade: atts.filter((t) => t.status === 'rendu').length,
-      classSize: db.users.filter((u) => u.role === 'student' && u.classeId === a.classeId).length,
+      classSize: studentsOf(a).length,
     }
   }).sort((x, y) => (y.createdAt > x.createdAt ? 1 : -1))
 }
@@ -820,7 +832,7 @@ function validateAssessment(a, publish) {
       if (!(a.questions || []).some((q) => q.sectionId === x.id)) throw new ApiError(`Exercice ${i + 1} (${x.title}) : ajoutez au moins une question.`)
     }
   }
-  if (!a.matiereId || !a.classeId) throw new ApiError('Choisissez une matière et une classe.')
+  if (!a.matiereId || !classIdsOf(a).length) throw new ApiError('Choisissez une matière et au moins une classe.')
   // Les outils utilisés doivent être prévus pour la matière (réglage de l'administrateur)
   const matiere = db.matieres.find((m) => m.id === Number(a.matiereId))
   for (const [i, q] of (a.questions || []).entries()) {
@@ -865,16 +877,19 @@ export async function saveAssessment(input, publish = false) {
   await load()
   const user = requireUser('teacher')
   const a = clone(input)
-  // Toutes les classes et matières de l'école sont ouvertes aux enseignants
-  if (!db.classes.some((c) => c.id === Number(a.classeId)) || !db.matieres.some((m) => m.id === Number(a.matiereId))) {
-    throw new ApiError('Choisissez une classe et une matière.')
+  // Toutes les classes et matières de l'école sont ouvertes aux enseignants ; une épreuve peut viser plusieurs classes
+  const classeIds = [...new Set(classIdsOf(a))].filter((id) => db.classes.some((c) => c.id === id))
+  if (!classeIds.length || !db.matieres.some((m) => m.id === Number(a.matiereId))) {
+    throw new ApiError('Choisissez au moins une classe et une matière.')
   }
+  a.classeIds = classeIds
+  a.classeId = classeIds[0]
   a.sections = cleanSections(a)
   validateAssessment(a, publish)
   for (const q of a.questions) if (!q.id || q.id < 0) q.id = nextId('question')
   const fields = {
     title: a.title.trim(), description: a.description || '', kind: a.kind,
-    matiereId: Number(a.matiereId), classeId: Number(a.classeId),
+    matiereId: Number(a.matiereId), classeId: a.classeId, classeIds: a.classeIds,
     startAt: a.startAt || null, endAt: a.endAt || null,
     durationMin: a.kind === 'examen' ? Number(a.durationMin) : null,
     maxAttempts: a.kind === 'devoir' ? Math.max(1, Number(a.maxAttempts) || 1) : 1,
@@ -898,7 +913,7 @@ export async function saveAssessment(input, publish = false) {
   if (publish && saved.status !== 'publie') {
     saved.status = 'publie'
     audit(user, 'publication_epreuve', saved.title)
-    const students = db.users.filter((u) => u.role === 'student' && u.classeId === saved.classeId)
+    const students = studentsOf(saved)
     for (const s of students) notify(s.id, saved.kind === 'examen' ? 'Nouvel examen' : 'Nouveau devoir', saved.title, saved.kind === 'examen' ? '/etudiant/examens' : '/etudiant/devoirs')
     if (saved.kind === 'examen' && !db.sessions.some((s) => s.assessmentId === saved.id)) {
       db.sessions.push({ id: nextId('session'), schoolId: user.schoolId, assessmentId: saved.id, code: randomCode(), room: '', status: 'planifiee', proctorId: null, openedAt: null, closedAt: null })
@@ -938,7 +953,7 @@ export async function setAssessmentStatus(id, status) {
   if (status === 'annule') {
     a.status = 'annule'
     for (const s of db.sessions.filter((x) => x.assessmentId === id && x.status !== 'fermee')) s.status = 'fermee'
-    for (const st of db.users.filter((u) => u.role === 'student' && u.classeId === a.classeId)) notify(st.id, 'Épreuve annulée', a.title)
+    for (const st of studentsOf(a)) notify(st.id, 'Épreuve annulée', a.title)
   }
   if (status === 'brouillon') {
     if (db.attempts.some((t) => t.assessmentId === id)) throw new ApiError('Des copies existent déjà : impossible de repasser en brouillon.')
@@ -1039,7 +1054,7 @@ export async function studentAssessments() {
   await load()
   const user = requireUser('student')
   return db.assessments
-    .filter((a) => a.classeId === user.classeId && a.status !== 'brouillon')
+    .filter((a) => classIdsOf(a).includes(user.classeId) && a.status !== 'brouillon')
     .map((a) => studentAssessmentView(a, user))
 }
 
@@ -1047,7 +1062,7 @@ export async function studentAssessments() {
 export async function studentAssessment(id) {
   await load()
   const user = requireUser('student')
-  const a = db.assessments.find((x) => x.id === Number(id) && x.classeId === user.classeId && x.status !== 'brouillon')
+  const a = db.assessments.find((x) => x.id === Number(id) && classIdsOf(x).includes(user.classeId) && x.status !== 'brouillon')
   if (!a) throw new ApiError('Épreuve introuvable.', 'not_found', 404)
   return studentAssessmentView(a, user)
 }
@@ -1124,7 +1139,7 @@ export async function joinWithCode(code) {
   const s = db.sessions.find((x) => x.code === code.trim().toUpperCase())
   if (!s) throw new ApiError('Ce code ne correspond à aucun examen. Vérifiez-le auprès du surveillant.', 'bad_code', 404)
   const a = db.assessments.find((x) => x.id === s.assessmentId)
-  if (!a || a.classeId !== user.classeId || a.status !== 'publie') throw new ApiError('Cet examen ne concerne pas votre classe.', 'forbidden', 403)
+  if (!a || !classIdsOf(a).includes(user.classeId) || a.status !== 'publie') throw new ApiError('Cet examen ne concerne pas votre classe.', 'forbidden', 403)
   if (s.status === 'planifiee') throw new ApiError('La session n\'est pas encore ouverte. Attendez le signal du surveillant.', 'not_open', 409)
   if (s.status === 'fermee') throw new ApiError('Cette session est fermée.', 'closed', 409)
   return { assessmentId: a.id, sessionId: s.id }
@@ -1161,7 +1176,7 @@ export async function startAttempt(assessmentId, sessionCode = null) {
   await load()
   const user = requireUser('student')
   closeExpiredAttempts()
-  const a = db.assessments.find((x) => x.id === Number(assessmentId) && x.classeId === user.classeId)
+  const a = db.assessments.find((x) => x.id === Number(assessmentId) && classIdsOf(x).includes(user.classeId))
   if (!a || a.status !== 'publie') throw new ApiError('Épreuve indisponible.', 'not_found', 404)
   const t = Date.now()
   const existing = attemptsOf(user.id, a.id).find((x) => x.status === 'en_cours')
@@ -1746,13 +1761,13 @@ export async function assessmentResults(assessmentId) {
   const user = requireUser('teacher', 'admin')
   const a = db.assessments.find((x) => x.id === Number(assessmentId))
   if (!a || (user.role === 'teacher' && a.teacherId !== user.id)) throw new ApiError('Épreuve introuvable.', 'not_found', 404)
-  const students = db.users.filter((u) => u.role === 'student' && u.classeId === a.classeId)
+  const students = studentsOf(a)
   const rows = students.map((s) => {
     const atts = attemptsOf(s.id, a.id)
     const graded = atts.filter((t) => t.status === 'corrige').sort((x, y) => y.score - x.score)[0]
     const last = atts.at(-1)
     return {
-      studentId: s.id, student: `${s.lastName} ${s.firstName}`, matricule: s.matricule,
+      studentId: s.id, student: `${s.lastName} ${s.firstName}`, matricule: s.matricule, classe: db.classes.find((c) => c.id === s.classeId)?.name ?? '',
       status: graded ? 'corrige' : last ? last.status : 'absent',
       score: graded?.score ?? null, note20: graded ? Math.round((graded.score / graded.maxScore) * 200) / 10 : null,
       attemptId: graded?.id ?? last?.id ?? null, risk: last ? riskScore(last.events) : 0,
@@ -1807,10 +1822,10 @@ export async function listSessions() {
     }
     return {
       ...clone(s), title: a.title, startAt: a.startAt, endAt: a.endAt, durationMin: a.durationMin,
-      classe: db.classes.find((c) => c.id === a.classeId)?.name ?? '',
+      classe: classNamesOf(a),
       matiere: db.matieres.find((m) => m.id === a.matiereId)?.name ?? '',
       cancelled: a.status === 'annule',
-      classSize: db.users.filter((u) => u.role === 'student' && u.classeId === a.classeId).length,
+      classSize: studentsOf(a).length,
       ...counts,
     }
   }).filter(Boolean)
@@ -1824,7 +1839,7 @@ export async function sessionDetail(sessionId) {
   const s = db.sessions.find((x) => x.id === Number(sessionId))
   if (!s) throw new ApiError('Session introuvable.', 'not_found', 404)
   const a = db.assessments.find((x) => x.id === s.assessmentId)
-  const students = db.users.filter((u) => u.role === 'student' && u.classeId === a.classeId)
+  const students = studentsOf(a)
   const participants = students.map((st) => {
     const t = db.attempts.find((x) => x.sessionId === s.id && x.studentId === st.id)
     const answered = t ? Object.values(t.answers).filter((v) => v.value !== null && v.value !== '' && !(Array.isArray(v.value) && !v.value.length)).length : 0
@@ -1975,7 +1990,7 @@ export async function search(qs) {
     if (user.role === 'teacher' || user.role === 'admin') {
       for (const a of db.assessments) {
         if ((user.role === 'admin' || a.teacherId === user.id) && (has(a.title))) {
-          out.push({ type: a.kind === 'examen' ? 'Examen' : 'Devoir', label: a.title, sub: db.classes.find((c) => c.id === a.classeId)?.name, link: user.role === 'admin' ? '/admin/epreuves' : `/enseignant/epreuves/${a.id}` })
+          out.push({ type: a.kind === 'examen' ? 'Examen' : 'Devoir', label: a.title, sub: classNamesOf(a), link: user.role === 'admin' ? '/admin/epreuves' : `/enseignant/epreuves/${a.id}` })
         }
       }
     }

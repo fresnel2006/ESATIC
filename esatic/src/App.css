@@ -890,3 +890,7 @@ h2, h3 { font-weight: 600; }
 .diagram-details summary { cursor: pointer; font-weight: 500; font-size: 0.9rem; }
 .diagram-details[open] summary { margin-bottom: 8px; }
 .diagram-help { border: 1px solid var(--border); border-radius: 8px; }
+
+/* Création d'épreuve : une ou plusieurs classes */
+.class-picker { display: grid; gap: 10px; padding: 12px; border: 1px solid var(--border); border-radius: 8px; }
+.class-picker-chosen { min-height: 20px; }

@@ -6,6 +6,7 @@ import { useToast } from '../../context/ToastContext.jsx'
 import QuestionEditor, { newQuestion, tempId } from '../../components/QuestionEditor.jsx'
 import Statement from '../../components/Statement.jsx'
 import { Confirm, Empty, ErrorBox, Loader, Modal, Notice, PageHead, StatusBadge, ICON } from '../../components/ui.jsx'
+import ClassPicker from '../../components/ClassPicker.jsx'
 import { fmtDateTime, fromLocalInput, toLocalInput, QUESTION_TYPES, LANGUAGES, LANG_ENV, TOOLS } from '../../lib/format.js'
 
 const STEPS = ['Informations', 'Dates et durée', 'Questions', 'Sécurité', 'Aperçu et publication']
@@ -24,7 +25,7 @@ function emptyAssessment() {
   end.setDate(end.getDate() + 7)
   end.setHours(18, 0, 0, 0)
   return {
-    id: null, title: '', description: '', kind: 'devoir', matiereId: '', classeId: '',
+    id: null, title: '', description: '', kind: 'devoir', matiereId: '', classeId: '', classeIds: [],
     startAt: start.toISOString(), endAt: end.toISOString(), durationMin: 60, maxAttempts: 1,
     languages: [],
     security: { fullscreen: false, blockPaste: true, sebRequired: false, sebKeys: '', shuffleQuestions: false, exitWarnings: null },
@@ -103,7 +104,8 @@ export default function EpreuveWizard() {
   useEffect(() => {
     import('../../components/CodeEditor.jsx') // préchargement de l'éditeur de code
     api.myTeaching().then(setTeaching).catch(setLoadError)
-    if (id) api.getAssessment(id).then(setA).catch(setLoadError)
+    // Épreuves créées avant le choix de plusieurs classes : classeId seul
+    if (id) api.getAssessment(id).then((x) => setA({ ...x, classeIds: x.classeIds?.length ? x.classeIds : x.classeId ? [x.classeId] : [] })).catch(setLoadError)
   }, [id])
 
   if (loadError) return <ErrorBox error={loadError} />
@@ -111,10 +113,10 @@ export default function EpreuveWizard() {
 
   const set = (patch) => setA((x) => ({ ...x, ...patch }))
   const setSec = (patch) => setA((x) => ({ ...x, security: { ...x.security, ...patch } }))
-  // Toutes les matières ; celles que l'enseignant a dans cette classe (puis ailleurs) en premier
-  const rank = (m) => (teaching.rows.some((r) => r.classeId === Number(a.classeId) && r.matiereId === m.id) ? 0 : teaching.rows.some((r) => r.matiereId === m.id) ? 1 : 2)
+  // Toutes les matières ; celles que l'enseignant a dans les classes choisies (puis ailleurs) en premier
+  const classeIds = a.classeIds || []
+  const rank = (m) => (teaching.rows.some((r) => classeIds.includes(r.classeId) && r.matiereId === m.id) ? 0 : teaching.rows.some((r) => r.matiereId === m.id) ? 1 : 2)
   const matieresForClass = [...teaching.matieres].sort((x, y) => rank(x) - rank(y) || x.name.localeCompare(y.name))
-  const levels = [...new Set(teaching.classes.map((c) => c.level || 'Autres'))]
   const total = a.questions.reduce((s, q) => s + Number(q.points || 0), 0)
   const locked = a.status === 'publie' && a.submitted > 0
   // Outils informatiques prévus par l'administration pour la matière choisie
@@ -135,7 +137,7 @@ export default function EpreuveWizard() {
   function stepError(s) {
     if (s === 0) {
       if (!a.title.trim()) return 'Le titre est obligatoire.'
-      if (!a.classeId || !a.matiereId) return 'Choisissez la classe et la matière.'
+      if (!classeIds.length || !a.matiereId) return 'Choisissez au moins une classe et la matière.'
     }
     if (s === 2) {
       const k = sections.findIndex((x) => !x.title.trim())
@@ -258,17 +260,6 @@ export default function EpreuveWizard() {
               <textarea id="w-desc" className="textarea" style={{ minHeight: 80 }} value={a.description} onChange={(e) => set({ description: e.target.value })} />
             </div>
             <div className="field">
-              <label htmlFor="w-classe">Classe</label>
-              <select id="w-classe" className="select" value={a.classeId} onChange={(e) => set({ classeId: Number(e.target.value), matiereId: '' })} disabled={isPublished}>
-                <option value="">Choisir une classe</option>
-                {levels.map((l) => (
-                  <optgroup key={l} label={l}>
-                    {teaching.classes.filter((c) => (c.level || 'Autres') === l).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                  </optgroup>
-                ))}
-              </select>
-            </div>
-            <div className="field">
               <label htmlFor="w-mat">Matière</label>
               <select id="w-mat" className="select" value={a.matiereId} disabled={isPublished} onChange={(e) => {
                 // Si la matière n'a qu'un langage, il est choisi d'office
@@ -284,6 +275,11 @@ export default function EpreuveWizard() {
                   {tools.length ? `Outils informatiques : ${tools.map((t) => TOOLS[t].label).join(', ')}` : 'Pas d\'outil informatique : QCM et questions ouvertes'}
                 </span>
               )}
+            </div>
+            <div className="field span-2">
+              <span className="label">Classes concernées</span>
+              <span className="hint">Une, deux ou plusieurs classes : tous leurs étudiants reçoivent l'épreuve et la rendent au même endroit.{isPublished ? ' (Épreuve publiée : les classes ne se modifient plus.)' : ''}</span>
+              <ClassPicker classes={teaching.classes} value={classeIds} disabled={isPublished} onChange={(ids) => set({ classeIds: ids, classeId: ids[0] ?? '' })} />
             </div>
             <div className="field span-2">
               <span className="label">Type d'épreuve</span>
@@ -483,7 +479,7 @@ export default function EpreuveWizard() {
             <div className="form-grid cols-3">
               <div><div className="label">Titre</div><div>{a.title || '-'}</div></div>
               <div><div className="label">Type</div><div>{a.kind === 'examen' ? 'Examen surveillé' : 'Devoir'}</div></div>
-              <div><div className="label">Classe / matière</div><div>{teaching.classes.find((c) => c.id === Number(a.classeId))?.name || '-'} - {teaching.matieres.find((m) => m.id === Number(a.matiereId))?.name || '-'}</div></div>
+              <div><div className="label">Classes / matière</div><div>{teaching.classes.filter((c) => classeIds.includes(c.id)).map((c) => c.name).join(', ') || '-'} - {teaching.matieres.find((m) => m.id === Number(a.matiereId))?.name || '-'}</div></div>
               <div><div className="label">{a.kind === 'examen' ? 'Créneau' : 'Période'}</div><div>{fmtDateTime(a.startAt)} - {fmtDateTime(a.endAt)}</div></div>
               <div><div className="label">{a.kind === 'examen' ? 'Durée' : 'Tentatives'}</div><div>{a.kind === 'examen' ? `${a.durationMin} min` : a.maxAttempts}</div></div>
               <div><div className="label">Questions</div><div>{a.questions.length} - {total} points</div></div>

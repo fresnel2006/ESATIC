@@ -20,7 +20,7 @@ export default function TeacherResultats() {
         title="Résultats"
         subtitle="Notes par épreuve et par classe"
         actions={r && <>
-          <button className="btn btn-secondary" onClick={() => downloadCsv(`notes-${r.assessment.title}.csv`, r.rows.map((x) => ({ Matricule: x.matricule, 'Nom et prénom': x.student, Statut: x.status, Points: x.score ?? '', 'Note sur 20': x.note20 ?? '' })))}><Download {...ICON} /> Exporter (CSV)</button>
+          <button className="btn btn-secondary" onClick={() => downloadCsv(`notes-${r.assessment.title}.csv`, r.rows.map((x) => ({ Matricule: x.matricule, 'Nom et prénom': x.student, Classe: x.classe, Statut: x.status, Points: x.score ?? '', 'Note sur 20': x.note20 ?? '' })))}><Download {...ICON} /> Exporter (CSV)</button>
           {r.rows.some((x) => x.status === 'corrige') && (
             <button className="btn btn-primary" onClick={async () => { try { await api.publishResults(r.assessment.id, !r.assessment.resultsPublished); toast.success(r.assessment.resultsPublished ? 'Notes retirées.' : 'Notes publiées.'); res.reload() } catch (e) { toast.error(e.message) } }}>
               {r.assessment.resultsPublished ? 'Retirer la publication' : 'Publier les notes'}
@@ -49,6 +49,7 @@ export default function TeacherResultats() {
               rows={r.rows}
               columns={[
                 { key: 'student', label: 'Étudiant', primary: true, render: (x) => <span>{x.student} <span className="muted small">{x.matricule}</span></span> },
+                ...(new Set(r.rows.map((x) => x.classe)).size > 1 ? [{ key: 'classe', label: 'Classe', render: (x) => <span className="nowrap">{x.classe}</span> }] : []),
                 { key: 'status', label: 'Statut', render: (x) => <StatusBadge status={x.status} /> },
                 { key: 'risk', label: 'Risque', render: (x) => <RiskBadge value={x.risk} /> },
                 { key: 'score', label: 'Points', render: (x) => (x.score === null ? '-' : `${fmtNote(x.score)} / ${r.assessment.maxPoints}`) },
