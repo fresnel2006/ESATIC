@@ -175,7 +175,9 @@ export function buildExtraExams() {
   })
 
   exams.push({
-    id: 18, matiereId: 2, title: 'TP noté - Modélisation Merise et UML', durationMin: 90,
+    // TP à faire en ligne : un devoir (pas de code d'accès ni de surveillance), rendu avant la date limite
+    id: 18, matiereId: 2, kind: 'devoir', title: 'TP noté - Modélisation Merise et UML', durationMin: 90,
+    security: security({ fullscreen: false, exitWarnings: null }),
     description: "Diagrammes réalisés dans l'éditeur de la plateforme et corrigés par l'enseignant.",
     questions: [
       q('diagram', 'Merise : une école gère des étudiants, des classes et des matières. Un étudiant appartient à une seule classe ; une classe compte au moins un étudiant. Un enseignant enseigne une ou plusieurs matières dans des classes. Réalisez le MCD avec les cardinalités.', 10, { notation: 'merise', starterXml: '', answerModelXml: '' }),
@@ -191,9 +193,10 @@ export function buildExtraExams() {
     languages: [...new Set(e.questions.filter((x) => x.type === 'code').map((x) => x.data.language))],
     ...e,
   }))
+  // Sessions de surveillance : seulement pour les examens (les devoirs n'ont pas de code d'accès)
   const sessions = assessments.map((a, i) => ({
     id: 20 + i, schoolId: 1, assessmentId: a.id, code: codes[a.id], room: 'Salle informatique 2',
     status: 'ouverte', proctorId: 4, openedAt: at(-1 * H), closedAt: null,
-  }))
+  })).filter((s) => assessments.find((a) => a.id === s.assessmentId)?.kind === 'examen')
   return { assessments, sessions }
 }

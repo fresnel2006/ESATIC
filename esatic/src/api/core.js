@@ -160,6 +160,14 @@ function migrate() {
     for (const a of db.assessments) {
       if (DEMO_DESC[a.id] && /Docker|service d'exécution/.test(a.description || '')) { a.description = DEMO_DESC[a.id]; changed = true }
     }
+    // TP de modélisation de démonstration : devoir (sans code d'accès), et non plus examen surveillé
+    const tp = db.assessments.find((a) => a.id === 18 && a.kind === 'examen' && /^TP noté - Modélisation/.test(a.title || ''))
+    if (tp) {
+      tp.kind = 'devoir'
+      tp.security = { ...tp.security, fullscreen: false, exitWarnings: null }
+      db.sessions = db.sessions.filter((s) => s.assessmentId !== 18)
+      changed = true
+    }
     // Nouveaux examens de programmation de démonstration (ajoutés sans toucher au reste)
     const extra = buildExtraExams()
     for (const a of extra.assessments) {
