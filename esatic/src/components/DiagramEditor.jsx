@@ -7,13 +7,16 @@ import { Loader2 } from 'lucide-react'
 // --- Bibliothèque Merise (MCD, MLD) proposée dans le panneau de gauche ---------------------------------
 const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 const model = (cells) => `<mxGraphModel><root><mxCell id="0"/><mxCell id="1" parent="0"/>${cells}</root></mxGraphModel>`
+// Entité, association avec attributs, table : un bandeau de titre et, dessous, la zone des attributs.
+// resizeParent=0 et resizeLast=1 : l'étudiant agrandit ou rétrécit la forme comme il veut, et la zone des
+// attributs suit. (Avec resizeParent=1, draw.io recalculait la hauteur tout seul : impossible de la changer.)
 const box = (title, lines, { w = 160, rounded = false } = {}) => {
-  const h = 26 + lines.length * 20 + 8
+  const h = 26 + lines.length * 20 + 10
   return {
     w, h, title,
     xml: model(
-      `<mxCell id="2" value="${esc(title)}" style="swimlane;fontStyle=1;childLayout=stackLayout;horizontal=1;startSize=26;horizontalStack=0;resizeParent=1;resizeParentMax=0;collapsible=0;marginBottom=0;html=1;whiteSpace=wrap;${rounded ? 'rounded=1;arcSize=20;' : ''}" vertex="1" parent="1"><mxGeometry width="${w}" height="${h}" as="geometry"/></mxCell>`
-      + `<mxCell id="3" value="${esc(lines.join('<br>'))}" style="text;html=1;align=left;verticalAlign=top;spacingLeft=8;spacingTop=2;whiteSpace=wrap;" vertex="1" parent="2"><mxGeometry y="26" width="${w}" height="${h - 26}" as="geometry"/></mxCell>`,
+      `<mxCell id="2" value="${esc(title)}" style="swimlane;fontStyle=1;childLayout=stackLayout;horizontal=1;startSize=26;horizontalStack=0;resizeParent=0;resizeLast=1;collapsible=0;marginBottom=0;html=1;whiteSpace=wrap;${rounded ? 'rounded=1;arcSize=18;' : ''}" vertex="1" parent="1"><mxGeometry width="${w}" height="${h}" as="geometry"/></mxCell>`
+      + `<mxCell id="3" value="${esc(lines.join('<br>'))}" style="text;html=1;align=left;verticalAlign=top;spacingLeft=8;spacingTop=2;whiteSpace=wrap;overflow=hidden;" vertex="1" parent="2"><mxGeometry y="26" width="${w}" height="${h - 26}" as="geometry"/></mxCell>`,
     ),
   }
 }

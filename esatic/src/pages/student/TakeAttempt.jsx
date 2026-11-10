@@ -231,7 +231,7 @@ function QuestionBody({ q, value, onChange, onBigInsert, desktop }) {
           <Info size={14} />
           <span>
             Glissez les formes depuis le panneau de gauche (Merise, Relation d'entité, UML). Reliez deux formes en tirant une flèche depuis le bord de l'une vers l'autre.
-            Double-cliquez sur un lien pour écrire sa cardinalité (0,1, 1,1, 0,n, 1,n), ou sur une forme pour changer son texte. Votre diagramme est enregistré automatiquement.
+            Double-cliquez sur un lien pour écrire sa cardinalité (0,1, 1,1, 0,n, 1,n), ou sur une forme pour changer son texte. Pour changer la taille d'une forme, cliquez dessus puis tirez un des petits carrés bleus. Ctrl+Z annule. Votre diagramme est enregistré automatiquement.
           </span>
         </div>
         <Suspense fallback={<Loader label="Ouverture de l'éditeur de diagrammes..." />}>
