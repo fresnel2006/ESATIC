@@ -37,8 +37,16 @@ const LIBRARIES = {
   libre: 'merise;uml;er;general',
 }
 
+// draw.io garde ses réglages (bibliothèques ouvertes...) dans le navigateur. Un nom de réglages par notation,
+// remis à zéro à chaque ouverture : chaque question s'ouvre avec les formes choisies par l'enseignant.
+const settingsName = (notation) => `esatic-${LIBRARIES[notation] ? notation : 'libre'}`
+function resetSettings(notation) {
+  try { localStorage.removeItem(`.${settingsName(notation)}-config`) } catch { /* stockage indisponible */ }
+}
+
 function config(notation) {
   return {
+    settingsName: settingsName(notation),
     defaultLibraries: LIBRARIES[notation] || LIBRARIES.libre,
     enabledLibraries: ['merise', 'uml', 'er', 'general', 'basic', 'arrows2', 'flowchart'],
     libraries: [{
@@ -68,7 +76,7 @@ export default function DiagramEditor({ value, onChange, notation = 'libre', rea
       let msg
       try { msg = JSON.parse(e.data) } catch { return }
       const send = (m) => frame.current?.contentWindow?.postMessage(JSON.stringify(m), '*')
-      if (msg.event === 'configure') send({ action: 'configure', config: config(notation) })
+      if (msg.event === 'configure') { resetSettings(notation); send({ action: 'configure', config: config(notation) }) }
       else if (msg.event === 'init') send({ action: 'load', xml: first.current || '', autosave: readOnly ? 0 : 1, noExitBtn: 1 })
       else if (msg.event === 'load') setReady(true)
       else if (msg.event === 'autosave' && !readOnly) cb.current?.(isEmptyDiagram(msg.xml) ? '' : msg.xml)
