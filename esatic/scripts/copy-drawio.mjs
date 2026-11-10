@@ -9,6 +9,8 @@ import { fileURLToPath } from 'node:url'
 import { unzipSync } from 'fflate'
 
 const VERSION = '32.6.10'
+// Réglages ajoutés par la plateforme (scripts/drawio-esatic.js) : changer ce numéro pour les recopier
+const PATCH = 'esatic-2'
 const URL_WAR = `https://github.com/jgraph/drawio/releases/download/v${VERSION}/draw.war`
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)))
@@ -30,7 +32,7 @@ const SKIP_DIRS = ['img/lib/', 'img/clipart/']
 const keep = (name) => !name.endsWith('/') && !name.endsWith('.map')
   && (KEEP_FILES.has(name) || (KEEP_DIRS.some((d) => name.startsWith(d)) && !SKIP_DIRS.some((d) => name.startsWith(d))))
 
-if (fs.existsSync(marker) && fs.readFileSync(marker, 'utf8').trim() === VERSION) {
+if (fs.existsSync(marker) && fs.readFileSync(marker, 'utf8').trim() === `${VERSION}+${PATCH}`) {
   process.exit(0)
 }
 
@@ -56,5 +58,7 @@ for (const [name, data] of Object.entries(files)) {
   fs.writeFileSync(to, data)
   size += data.length
 }
-fs.writeFileSync(marker, VERSION + '\n')
+// Réglages de la plateforme (scripts/drawio-esatic.js), chargés par draw.io juste après l'éditeur
+fs.appendFileSync(path.join(dest, 'js', 'PostConfig.js'), fs.readFileSync(path.join(root, 'scripts', 'drawio-esatic.js'), 'utf8'))
+fs.writeFileSync(marker, `${VERSION}+${PATCH}\n`)
 console.log(`[drawio] ${Object.keys(files).length} fichiers copiés dans public/drawio (${(size / 1048576).toFixed(1)} Mo)`)
