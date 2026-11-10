@@ -7,14 +7,17 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { unzipSync } from 'fflate'
+import { DRAWIO_VERSION, DRAWIO_PATCH, DRAWIO_DIR } from '../src/lib/drawioVersion.js'
 
-const VERSION = '32.6.10'
-// Réglages ajoutés par la plateforme (scripts/drawio-esatic.js) : changer ce numéro pour les recopier
-const PATCH = 'esatic-2'
+// Version et numéro des réglages : src/lib/drawioVersion.js (à changer pour publier une nouvelle version)
+const VERSION = DRAWIO_VERSION
+const PATCH = DRAWIO_PATCH
 const URL_WAR = `https://github.com/jgraph/drawio/releases/download/v${VERSION}/draw.war`
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)))
-const dest = path.join(root, 'public', 'drawio')
+// Un dossier par version (public/drawio/<version>) : les navigateurs ne gardent jamais une ancienne version
+const base = path.join(root, 'public', 'drawio')
+const dest = path.join(root, 'public', ...DRAWIO_DIR.split('/').filter(Boolean))
 const cacheDir = path.join(root, 'node_modules', '.cache', 'esatic-drawio')
 const cacheFile = path.join(cacheDir, `draw-${VERSION}.war`)
 const marker = path.join(dest, '.version')
@@ -48,7 +51,7 @@ if (!fs.existsSync(cacheFile)) {
 }
 
 const files = unzipSync(new Uint8Array(fs.readFileSync(cacheFile)), { filter: (f) => keep(f.name) })
-fs.rmSync(dest, { recursive: true, force: true })
+fs.rmSync(base, { recursive: true, force: true }) // anciennes versions comprises
 let size = 0
 for (const [name, data] of Object.entries(files)) {
   // Chemins venant de l'archive : on refuse tout ce qui sortirait du dossier de destination

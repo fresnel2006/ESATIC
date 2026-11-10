@@ -3,6 +3,7 @@
 // Le diagramme est rangé en XML draw.io : il se rouvre tel quel pour l'étudiant et pour le correcteur.
 import { useEffect, useRef, useState } from 'react'
 import { Loader2 } from 'lucide-react'
+import { DRAWIO_DIR } from '../lib/drawioVersion.js'
 
 // --- Bibliothèque Merise (MCD, MLD) proposée dans le panneau de gauche ---------------------------------
 const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
@@ -88,7 +89,7 @@ export default function DiagramEditor({ value, onChange, readOnly = false, heigh
     return () => window.removeEventListener('message', onMessage)
   }, [readOnly])
 
-  const src = `/drawio/index.html?${PARAMS}${readOnly ? '&chrome=0&nav=1' : ''}`
+  const src = `${DRAWIO_DIR}/index.html?${PARAMS}${readOnly ? '&chrome=0&nav=1' : ''}`
   return (
     <div className="diagram-editor" style={{ height }}>
       {!ready && <div className="diagram-loading"><Loader2 size={16} className="spin" /> Ouverture de l'éditeur de diagrammes...</div>}
