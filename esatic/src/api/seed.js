@@ -173,10 +173,10 @@ export async function buildSeed(hash = hashPassword) {
     { id: 8, schoolId: SCHOOL, teacherId: 2, classeId: 1, matiereId: 6 },
   ]
 
-  // exitWarnings : 1 = avertissement à la 1re sortie, copie envoyée à la 2e ; null = signalement seulement
+  // exitWarnings : 2 = avertissement aux 1re et 2e sorties, copie envoyée à la 3e ; null = signalement seulement
   const security = (over = {}) => ({
     fullscreen: true, blockPaste: true, sebRequired: false, sebKeys: '', shuffleQuestions: false, showResultsAfter: false,
-    exitWarnings: over.fullscreen === false ? null : 1, ...over,
+    exitWarnings: over.fullscreen === false ? null : 2, ...over,
   })
 
   // ---------- Questions ----------

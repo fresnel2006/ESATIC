@@ -234,7 +234,7 @@ function QuestionBody({ q, value, onChange, onBigInsert, desktop }) {
           </span>
         </div>
         <Suspense fallback={<Loader variant="block" label="Ouverture de l'éditeur de diagrammes..." />}>
-          <DiagramEditor key={q.id} value={value || q.data.starterXml || ''} onChange={onChange} height={600} />
+          <DiagramEditor key={q.id} value={value || q.data.starterXml || ''} onChange={onChange} height="calc(100vh - 150px)" expandable />
         </Suspense>
       </div>
     )
@@ -325,7 +325,7 @@ export default function TakeAttempt() {
   }, [])
 
   // ---------- Sorties de l'épreuve : avertissement, puis envoi automatique ----------
-  // exitWarnings = nombre d'avertissements avant l'envoi (1 : avertissement à la 1re sortie, envoi à la 2e).
+  // exitWarnings = nombre d'avertissements avant l'envoi (2 : avertissement aux 1re et 2e sorties, envoi à la 3e).
   const exitWarnings = security?.exitWarnings ?? null
   const exits = useRef(0)
   const lastExitAt = useRef(0)
@@ -588,8 +588,9 @@ export default function TakeAttempt() {
               Vous avez quitté l'épreuve (sortie du plein écran ou changement de fenêtre). Cette sortie est enregistrée.
             </p>
             <p className="warning-rule">
+              <b>Sortie {warning.n} sur {warning.n + warning.left + 1}.</b>{' '}
               {warning.left > 0
-                ? `Encore ${warning.left} avertissement${warning.left > 1 ? 's' : ''} possible${warning.left > 1 ? 's' : ''}, ensuite la copie sera envoyée automatiquement.`
+                ? `À la ${warning.n + warning.left + 1}e sortie, votre copie sera envoyée automatiquement avec les réponses déjà saisies.`
                 : 'Si vous quittez encore une fois l\'épreuve, votre copie sera envoyée automatiquement avec les réponses déjà saisies.'}
             </p>
             <button className="btn btn-primary btn-lg" onClick={async () => { setWarning(null); if (needFs && !document.fullscreenElement) await enterFullscreen() }}>

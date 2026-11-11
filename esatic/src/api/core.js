@@ -153,11 +153,13 @@ function migrate() {
       a.languages = languagesOf(a.questions)
       changed = true
     }
-    // Avertissement puis envoi de la copie : activé par défaut pour les examens surveillés
+    // Avertissements puis envoi de la copie : activé par défaut pour les examens surveillés.
+    // Règle de l'école : avertissement aux 1re et 2e sorties, copie envoyée à la 3e (exitWarnings = 2).
     if (a.security && a.security.exitWarnings === undefined) {
-      a.security.exitWarnings = a.kind === 'examen' && a.security.fullscreen ? 1 : null
+      a.security.exitWarnings = a.kind === 'examen' && a.security.fullscreen ? 2 : null
       changed = true
     }
+    if (a.security?.exitWarnings === 1) { a.security.exitWarnings = 2; changed = true } // ancienne règle (envoi à la 2e)
   }
   // Ajouts de démonstration : seulement dans une base de démonstration, jamais dans la vraie base de l'école.
   // (Base de démo : school.demo vrai ; les bases de démo plus anciennes se reconnaissent au compte ETU24001.)

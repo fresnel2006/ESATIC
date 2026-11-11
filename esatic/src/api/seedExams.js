@@ -23,7 +23,7 @@ const web = (statement, starters, criteria) =>
     criteria: criteria.map(([label, points], i) => ({ id: `c${i + 1}`, label, points })),
   })
 const security = (over = {}) => ({
-  fullscreen: true, blockPaste: true, sebRequired: false, sebKeys: '', shuffleQuestions: false, showResultsAfter: false, exitWarnings: 1, ...over,
+  fullscreen: true, blockPaste: true, sebRequired: false, sebKeys: '', shuffleQuestions: false, showResultsAfter: false, exitWarnings: 2, ...over,
 })
 
 const SCHEMA_NOTES = `CREATE TABLE etudiant (id INTEGER PRIMARY KEY, nom TEXT, prenom TEXT, classe TEXT);

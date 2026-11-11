@@ -2,7 +2,7 @@
 // (public/drawio, copié par scripts/copy-drawio.mjs), dans un cadre. Échanges par messages (protocole « embed »).
 // Le diagramme est rangé en XML draw.io : il se rouvre tel quel pour l'étudiant et pour le correcteur.
 import { useEffect, useRef, useState } from 'react'
-import { Loader2 } from 'lucide-react'
+import { Loader2, Maximize2, Minimize2, Shapes } from 'lucide-react'
 import { DRAWIO_DIR } from '../lib/drawioVersion.js'
 
 // --- Bibliothèque Merise (MCD, MLD) proposée dans le panneau de gauche ---------------------------------
@@ -67,9 +67,19 @@ const PARAMS = 'embed=1&proto=json&spin=1&ui=kennedy&lang=fr&libraries=1&configu
 export const isEmptyDiagram = (xml) => !xml || !/<mxCell[^>]*\s(vertex|edge)="1"/.test(xml)
 
 // value : XML du diagramme ; onChange(xml) à chaque modification (« » si le diagramme est vide)
-export default function DiagramEditor({ value, onChange, readOnly = false, height = 560, title = 'Éditeur de diagrammes' }) {
+// expandable : barre avec « Plein écran ». L'éditeur occupe alors toute la fenêtre ; le même cadre est gardé
+// (rien n'est rechargé, le diagramme en cours n'est pas perdu).
+export default function DiagramEditor({ value, onChange, readOnly = false, height = 560, title = 'Éditeur de diagrammes', expandable = false }) {
   const frame = useRef(null)
   const [ready, setReady] = useState(false)
+  const [full, setFull] = useState(false)
+  useEffect(() => {
+    if (!full) return
+    // Pas de touche Échap : pendant un examen, elle fait aussi quitter le plein écran du navigateur (sortie comptée)
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = prev }
+  }, [full])
   const first = useRef(value) // contenu chargé à l'ouverture ; ensuite, c'est l'éditeur qui fait foi
   const cb = useRef(onChange)
   useEffect(() => { cb.current = onChange }, [onChange])
@@ -91,9 +101,19 @@ export default function DiagramEditor({ value, onChange, readOnly = false, heigh
 
   const src = `${DRAWIO_DIR}/index.html?${PARAMS}${readOnly ? '&chrome=0&nav=1' : ''}`
   return (
-    <div className="diagram-editor" style={{ height }}>
-      {!ready && <div className="diagram-loading"><Loader2 size={16} className="spin" /> Ouverture de l'éditeur de diagrammes...</div>}
-      <iframe ref={frame} src={src} title={title} style={{ visibility: ready ? 'visible' : 'hidden' }} />
+    <div className={`diagram-editor ${expandable ? 'expandable' : ''} ${full ? 'full' : ''}`} style={full ? undefined : { height }}>
+      {expandable && (
+        <div className="diagram-bar">
+          <span className="diagram-bar-title"><Shapes size={16} /> {full ? 'Modélisation en plein écran' : 'Modélisation'}<span className="muted small"> · enregistré automatiquement</span></span>
+          <button type="button" className={`btn btn-sm ${full ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setFull((f) => !f)}>
+            {full ? <><Minimize2 size={15} /> Quitter le plein écran</> : <><Maximize2 size={15} /> Plein écran</>}
+          </button>
+        </div>
+      )}
+      <div className="diagram-frame">
+        {!ready && <div className="diagram-loading"><Loader2 size={16} className="spin" /> Ouverture de l'éditeur de diagrammes...</div>}
+        <iframe ref={frame} src={src} title={title} style={{ visibility: ready ? 'visible' : 'hidden' }} />
+      </div>
     </div>
   )
 }

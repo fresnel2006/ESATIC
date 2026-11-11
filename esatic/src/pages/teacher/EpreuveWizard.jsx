@@ -289,7 +289,7 @@ export default function EpreuveWizard() {
                   ['examen', 'Examen surveillé', 'Créneau fixe, chronomètre, code d\'accès donné par le surveillant, règles de sécurité.'],
                 ].map(([k, t, d]) => (
                   <label key={k} className={`choice ${a.kind === k ? 'selected' : ''}`} style={{ alignItems: 'flex-start' }}>
-                    <input type="radio" name="kind" checked={a.kind === k} disabled={isPublished} onChange={() => set({ kind: k, security: { ...a.security, fullscreen: k === 'examen', exitWarnings: k === 'examen' ? 1 : null } })} />
+                    <input type="radio" name="kind" checked={a.kind === k} disabled={isPublished} onChange={() => set({ kind: k, security: { ...a.security, fullscreen: k === 'examen', exitWarnings: k === 'examen' ? 2 : null } })} />
                     <span><strong>{t}</strong><span className="small muted" style={{ display: 'block' }}>{d}</span></span>
                   </label>
                 ))}
@@ -454,10 +454,10 @@ export default function EpreuveWizard() {
           <div>
             <Toggle title="Plein écran obligatoire" desc="Une sortie du plein écran est enregistrée et un message calme invite l'étudiant à y revenir. Personne n'est exclu automatiquement." checked={a.security.fullscreen} onChange={(v) => setSec({ fullscreen: v })} />
             <Toggle
-              title="Envoyer la copie après un avertissement"
-              desc="À la 1re sortie de l'épreuve (plein écran quitté ou changement de fenêtre), un avertissement s'affiche. À la 2e sortie, la copie est envoyée automatiquement avec les réponses déjà saisies. Désactivé : les sorties sont seulement signalées."
+              title="Envoyer la copie à la 3e sortie"
+              desc="Aux 1re et 2e sorties de l'épreuve (plein écran quitté ou changement de fenêtre), un avertissement s'affiche. À la 3e sortie, la copie est envoyée automatiquement avec les réponses déjà saisies. Désactivé : les sorties sont seulement signalées."
               checked={!!a.security.exitWarnings}
-              onChange={(v) => setSec({ exitWarnings: v ? 1 : null })}
+              onChange={(v) => setSec({ exitWarnings: v ? 2 : null })}
             />
             <Toggle title="Bloquer le copier-coller externe" desc="Copier, couper, coller, glisser-déposer et clic droit sont bloqués. Dans les zones de réponse, l'étudiant peut recoller ce qu'il a lui-même copié." checked={a.security.blockPaste} onChange={(v) => setSec({ blockPaste: v })} />
             <Toggle title="Mélanger l'ordre des questions" desc="Chaque étudiant reçoit les questions dans un ordre différent." checked={a.security.shuffleQuestions} onChange={(v) => setSec({ shuffleQuestions: v })} />
@@ -484,7 +484,7 @@ export default function EpreuveWizard() {
               <div><div className="label">{a.kind === 'examen' ? 'Durée' : 'Tentatives'}</div><div>{a.kind === 'examen' ? `${a.durationMin} min` : a.maxAttempts}</div></div>
               <div><div className="label">Questions</div><div>{a.questions.length} - {total} points</div></div>
               <div><div className="label">Langage</div><div>{codeLangs.length ? codeLangs.map((l) => TOOLS[l].label).join(', ') : '-'}</div></div>
-              <div className="span-2"><div className="label">Sécurité</div><div>{[a.security.fullscreen && 'Plein écran', a.security.exitWarnings && 'Copie envoyée à la 2e sortie', a.security.blockPaste && 'Copier-coller externe bloqué', a.security.shuffleQuestions && 'Ordre mélangé', a.security.sebRequired && 'Safe Exam Browser'].filter(Boolean).join(', ') || 'Aucune règle'}</div></div>
+              <div className="span-2"><div className="label">Sécurité</div><div>{[a.security.fullscreen && 'Plein écran', a.security.exitWarnings && 'Copie envoyée à la 3e sortie', a.security.blockPaste && 'Copier-coller externe bloqué', a.security.shuffleQuestions && 'Ordre mélangé', a.security.sebRequired && 'Safe Exam Browser'].filter(Boolean).join(', ') || 'Aucune règle'}</div></div>
             </div>
             <div className="stack-sm">
               <span className="label">Aperçu des questions (vue étudiant)</span>

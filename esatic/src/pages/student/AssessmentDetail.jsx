@@ -64,7 +64,7 @@ export default function AssessmentDetail() {
     [ListChecks, `${a.questionCount} question${a.questionCount > 1 ? 's' : ''}, ${a.maxPoints} points au total.`],
     a.languages?.length > 0 && [FileCode2, languageRule(a.languages, execution)],
     a.security.fullscreen && [Maximize, "L'épreuve se fait en plein écran. Une sortie du plein écran est enregistrée."],
-    a.security.exitWarnings && [TriangleAlert, 'Si vous quittez l\'épreuve (plein écran ou changement de fenêtre), un avertissement s\'affiche. À la deuxième sortie, votre copie est envoyée automatiquement.'],
+    a.security.exitWarnings && [TriangleAlert, 'Si vous quittez l\'épreuve (plein écran ou changement de fenêtre), un avertissement s\'affiche. À la troisième sortie, votre copie est envoyée automatiquement.'],
     a.security.blockPaste && [ClipboardX, "Le copier-coller depuis l'extérieur est bloqué. Dans l'éditeur, vous pouvez copier-coller votre propre code."],
     [ShieldCheck, 'Vos réponses sont enregistrées automatiquement. En cas de coupure, reconnectez-vous et reprenez où vous en étiez.'],
     [MonitorSmartphone, 'Les questions de code demandent un ordinateur. Sur téléphone, seuls les QCM et questions ouvertes sont accessibles.'],
