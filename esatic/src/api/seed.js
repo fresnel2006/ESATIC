@@ -36,6 +36,8 @@ const CLASSES = [
   ['I4SEI', 'I4SEI', 'L3'],
   // Classes préparatoires (OCaml) : Prépa 1 = MP2I, Prépa 2 = MPI
   ['MP2I', 'PREPA', 'Prépa 1'], ['MPI', 'PREPA', 'Prépa 2'],
+  // Licence 1 : SRIT 1 A, B, C et D
+  ['SRIT 1 D', 'SRIT', 'L1'],
 ]
 
 // Niveaux, dans l'ordre d'affichage (menus, cases à cocher, filtres)
@@ -44,7 +46,7 @@ export const LEVELS = ['L1', 'L2', 'L3', 'M1', 'M2', 'Prépa 1', 'Prépa 2']
 export const LEVEL_NAMES = { L1: 'Licence 1', L2: 'Licence 2', L3: 'Licence 3', M1: 'Master 1', M2: 'Master 2', 'Prépa 1': 'Prépa 1 (MP2I)', 'Prépa 2': 'Prépa 2 (MPI)' }
 
 // À augmenter à chaque ajout dans les listes ci-dessus : les bases existantes reçoivent les classes manquantes
-export const STRUCTURE_VERSION = 3
+export const STRUCTURE_VERSION = 4
 
 export function schoolStructure(year = '2026-2027') {
   const filieres = FILIERES.map((code, i) => ({ id: i + 1, schoolId: 1, code, name: FILIERE_NAMES[code] || code }))
