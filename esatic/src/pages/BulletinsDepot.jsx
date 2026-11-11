@@ -9,7 +9,7 @@ import { useToast } from '../context/ToastContext.jsx'
 import { Confirm, Empty, ErrorBox, Loader, Modal, Notice, PageHead, ResponsiveTable, Stat, StatusBadge, useAsync, ICON } from '../components/ui.jsx'
 import { fmtDateTime } from '../lib/format.js'
 import { BULLETIN_ACCEPT, checkBulletinFile, downloadBulletin, fmtSize, openBulletin, sendBulletin } from '../lib/bulletinFiles.js'
-import { LEVELS } from '../api/seed.js'
+import { LEVELS, LEVEL_NAMES } from '../api/seed.js'
 
 
 // Fichier du dépôt groupé -> étudiant dont le matricule figure dans le nom du fichier
@@ -214,7 +214,7 @@ export default function BulletinsDepot() {
             </select>
             <select className="select" value={classeId} onChange={(e) => setParam('classe', e.target.value)} aria-label="Classe">
               {grouped.map(([l, list]) => (
-                <optgroup key={l || 'autres'} label={l || 'Autres'}>
+                <optgroup key={l || 'autres'} label={LEVEL_NAMES[l] || l || 'Autres'}>
                   {list.map((c) => <option key={c.id} value={c.id}>{c.name} ({c.students} étudiant{c.students > 1 ? 's' : ''})</option>)}
                 </optgroup>
               ))}

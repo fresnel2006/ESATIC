@@ -1,6 +1,6 @@
 // Choix d'une ou plusieurs classes (création d'épreuve) : cases à cocher rangées de la L1 au M2,
 // avec « toutes » pour cocher un niveau entier d'un coup.
-import { LEVELS } from '../api/seed.js'
+import { LEVELS, LEVEL_NAMES } from '../api/seed.js'
 
 export default function ClassPicker({ classes, value = [], onChange, disabled = false }) {
   const levels = [...LEVELS, ...new Set(classes.map((c) => c.level || 'Autres').filter((l) => !LEVELS.includes(l)))]
@@ -25,7 +25,7 @@ export default function ClassPicker({ classes, value = [], onChange, disabled = 
                 type="button" className="assign-level-head" disabled={disabled}
                 onClick={() => onChange(all ? value.filter((id) => !list.some((c) => c.id === id)) : [...new Set([...value, ...list.map((c) => c.id)])])}
               >
-                {l} <span className="muted">{all ? 'aucune' : 'toutes'}</span>
+                {LEVEL_NAMES[l] || l} <span className="muted">{all ? 'aucune' : 'toutes'}</span>
               </button>
               {list.map((c) => (
                 <label key={c.id} className="checkbox small">

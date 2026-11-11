@@ -9,6 +9,7 @@ import { useToast } from '../context/ToastContext.jsx'
 import { Empty, ErrorBox, Loader, Modal, Notice, PageHead, ResponsiveTable, Stat, StatusBadge, useAsync, ICON } from '../components/ui.jsx'
 import { EVAL_TYPE_LABELS, EvalResultCard, QcmResult, ScoreBadge, ScoreBar, fmt5 } from '../components/EvalWidgets.jsx'
 import { fmtDateTime, fromLocalInput, toLocalInput } from '../lib/format.js'
+import { LEVELS, LEVEL_NAMES } from '../api/seed.js'
 
 // Modèle proposé par défaut : la direction pédagogique modifie, retire ou ajoute parties et questions
 const note = (label) => ({ type: 'note', label })
@@ -229,7 +230,10 @@ function Dashboard({ campaignId }) {
   if (loading && !data) return <Loader />
   const d = data.dashboard
   const classes = [...d.byClass].sort((a, b) => a.classe.localeCompare(b.classe, 'fr', { numeric: true }))
-  const classeId = Number(params.get('classe')) || classes[0]?.classeId
+  // Toutes les classes, rangées par niveau (L1 ... M2, prépas)
+  const levels = [...LEVELS, ...new Set(classes.map((c) => c.level || 'Autres').filter((l) => !LEVELS.includes(l)))]
+    .map((l) => ({ level: l, list: classes.filter((c) => (c.level || 'Autres') === l) })).filter((g) => g.list.length)
+  const classeId = Number(params.get('classe')) || (classes.find((c) => c.responses > 0) || classes.find((c) => c.expected > 0) || classes[0])?.classeId
   const maxDist = Math.max(1, ...d.distribution.map((x) => x.count))
 
   const tabs = (
@@ -243,20 +247,27 @@ function Dashboard({ campaignId }) {
     <div className="stack">
       {tabs}
       {!classes.length ? (
-        <div className="card"><Empty icon={Users} title="Aucune classe avec des enseignants affectés">L'administration affecte les enseignants à leurs classes (fiche de l'enseignant).</Empty></div>
+        <div className="card"><Empty icon={Users} title="Aucune classe">L'administration crée les classes (Structure).</Empty></div>
       ) : (
         <>
-          <div className="eval-class-picker">
-            {classes.map((x) => {
-              const pct = x.expected ? Math.round((x.responses / x.expected) * 100) : 0
-              return (
-                <button key={x.classeId} className={`eval-class ${x.classeId === classeId ? 'active' : ''}`} onClick={() => setP({ classe: x.classeId })}>
-                  <strong>{x.classe}</strong>
-                  <span className="small muted">{x.teachers} enseignant{x.teachers > 1 ? 's' : ''} · {x.responses} / {x.expected}</span>
-                  <span className="eval-rate"><span className="score-bar-track"><span className={`score-bar-fill ${pctTone(pct)}`} style={{ width: `${pct}%` }} /></span><b>{pct} %</b></span>
-                </button>
-              )
-            })}
+          <div className="eval-levels">
+            {levels.map((g) => (
+              <div key={g.level} className="eval-level">
+                <span className="eval-level-title">{LEVEL_NAMES[g.level] || g.level}<span className="muted"> · {g.list.length} classe{g.list.length > 1 ? 's' : ''}</span></span>
+                <div className="eval-class-picker">
+                  {g.list.map((x) => {
+                    const pct = x.expected ? Math.round((x.responses / x.expected) * 100) : 0
+                    return (
+                      <button key={x.classeId} className={`eval-class ${x.classeId === classeId ? 'active' : ''} ${x.expected ? '' : 'no-data'}`} onClick={() => setP({ classe: x.classeId })}>
+                        <strong>{x.classe}</strong>
+                        <span className="small muted">{!x.teachers ? 'Aucun enseignant affecté' : !x.students ? `${x.teachers} enseignant${x.teachers > 1 ? 's' : ''} · aucun étudiant` : `${x.teachers} enseignant${x.teachers > 1 ? 's' : ''} · ${x.responses} / ${x.expected}`}</span>
+                        <span className="eval-rate"><span className="score-bar-track"><span className={`score-bar-fill ${pctTone(pct)}`} style={{ width: `${pct}%` }} /></span><b>{x.expected ? `${pct} %` : '-'}</b></span>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            ))}
           </div>
           {classeId && <ClassView key={classeId} campaignId={campaignId} classeId={classeId} />}
         </>

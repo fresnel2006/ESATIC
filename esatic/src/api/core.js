@@ -2634,7 +2634,7 @@ function evalDashboard(responses, questions) {
     const teachers = classTeaching(cl.id).length
     const got = responses.filter((r) => r.classeId === cl.id).length
     return { classeId: cl.id, classe: cl.name, level: cl.level, students, teachers, expected: students * teachers, responses: got }
-  }).filter((x) => x.expected > 0)
+  }) // toutes les classes de l'école, même sans étudiant ni enseignant affecté
   const expected = byClass.reduce((n, x) => n + x.expected, 0)
   // École entière : moyennes des questions notées et répartition des réponses aux QCM (les réponses ouvertes
   // se lisent enseignant par enseignant, dans la fiche détaillée)

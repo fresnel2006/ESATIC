@@ -5,7 +5,7 @@ import * as api from '../../api/index.js'
 import { useToast } from '../../context/ToastContext.jsx'
 import { Confirm, Empty, ErrorBox, Loader, Modal, Notice, PageHead, ResponsiveTable, StatusBadge, Tabs, useAsync, ICON } from '../../components/ui.jsx'
 import { fmtShort, TOOLS } from '../../lib/format.js'
-import { LEVELS } from '../../api/seed.js'
+import { LEVELS, LEVEL_NAMES } from '../../api/seed.js'
 
 
 const TABS = [
@@ -116,7 +116,7 @@ export default function AdminStructure() {
               <div className="pills" role="group" aria-label="Filtrer par niveau">
                 {['', ...LEVELS].map((l) => (
                   <button key={l || 'all'} className={`pill ${level === l ? 'active' : ''}`} onClick={() => setLevel(l)}>
-                    {l || 'Tous'} <span className="muted">{(l ? s.classes.filter((c) => c.level === l) : s.classes).length}</span>
+                    {LEVEL_NAMES[l] || l || 'Tous'} <span className="muted">{(l ? s.classes.filter((c) => c.level === l) : s.classes).length}</span>
                   </button>
                 ))}
               </div>
@@ -149,7 +149,7 @@ export default function AdminStructure() {
               <div className="field">
                 <label htmlFor="s-level">Niveau</label>
                 <select id="s-level" className="select" value={edit.level ?? 'L1'} onChange={(e) => set({ level: e.target.value })}>
-                  {LEVELS.map((l) => <option key={l} value={l}>{l}</option>)}
+                  {LEVELS.map((l) => <option key={l} value={l}>{LEVEL_NAMES[l] || l}</option>)}
                 </select>
               </div>
               {input('year', 'Année académique')}

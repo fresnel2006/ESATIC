@@ -2,7 +2,7 @@
 // on choisit une matière, on coche une ou plusieurs classes (rangées de la L1 au M2), puis « Attribuer ».
 import { useState } from 'react'
 import { Plus, X } from 'lucide-react'
-import { LEVELS } from '../api/seed.js'
+import { LEVELS, LEVEL_NAMES } from '../api/seed.js'
 
 
 export default function TeacherAssignments({ classes, matieres, value, onChange }) {
@@ -58,7 +58,7 @@ export default function TeacherAssignments({ classes, matieres, value, onChange 
             return (
               <div key={l} className="assign-level">
                 <button type="button" className="assign-level-head" onClick={() => setChecked((x) => (all ? x.filter((id) => !list.some((c) => c.id === id)) : [...new Set([...x, ...list.map((c) => c.id)])]))}>
-                  {l} <span className="muted">{all ? 'aucune' : 'toutes'}</span>
+                  {LEVEL_NAMES[l] || l} <span className="muted">{all ? 'aucune' : 'toutes'}</span>
                 </button>
                 {list.map((c) => (
                   <label key={c.id} className={`checkbox small ${has(c.id, Number(matiereId)) ? 'muted' : ''}`}>

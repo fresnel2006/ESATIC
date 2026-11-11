@@ -40,6 +40,8 @@ const CLASSES = [
 
 // Niveaux, dans l'ordre d'affichage (menus, cases à cocher, filtres)
 export const LEVELS = ['L1', 'L2', 'L3', 'M1', 'M2', 'Prépa 1', 'Prépa 2']
+// Noms affichés des niveaux
+export const LEVEL_NAMES = { L1: 'Licence 1', L2: 'Licence 2', L3: 'Licence 3', M1: 'Master 1', M2: 'Master 2', 'Prépa 1': 'Prépa 1 (MP2I)', 'Prépa 2': 'Prépa 2 (MPI)' }
 
 // À augmenter à chaque ajout dans les listes ci-dessus : les bases existantes reçoivent les classes manquantes
 export const STRUCTURE_VERSION = 3
