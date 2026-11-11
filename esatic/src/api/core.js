@@ -2436,13 +2436,44 @@ export async function setEvalCampaignStatus(id, status) {
 }
 
 // GET /api/evaluations/campaigns/{id}/results (direction pédagogique : toutes ; enseignant : les siennes, après la clôture)
-export async function evalResults(campaignId) {
+// classeId (direction pédagogique) : résultats de cette classe seulement, calculés avec les seules réponses de ses
+// étudiants, pour chacun des enseignants qui lui sont affectés (même sans réponse).
+export async function evalResults(campaignId, classeId = null) {
   await load()
   const user = requireUser('pedagogy', 'teacher')
   const c = evalCampaignOf(campaignId)
   if (user.role === 'teacher' && c.status !== 'fermee') throw new ApiError('Les résultats seront disponibles à la clôture de la campagne.', 'forbidden', 403)
-  const responses = await platform.store.query('evalResponses', user.role === 'teacher' ? { campaignId: c.id, teacherId: user.id } : { campaignId: c.id })
   const questions = evalQuestions(c)
+  if (user.role === 'pedagogy' && classeId) {
+    const cl = db.classes.find((x) => x.id === Number(classeId))
+    if (!cl) throw new ApiError('Classe introuvable.', 'not_found', 404)
+    const responses = await platform.store.query('evalResponses', { campaignId: c.id, classeId: cl.id })
+    const rows = evalAggregate(responses, questions)
+    for (const t of classTeaching(cl.id)) {
+      if (!rows.some((r) => r.teacherId === t.teacherId && r.matiereId === t.matiereId)) {
+        rows.push({ teacherId: t.teacherId, teacher: fullName(t.teacherId), matiereId: t.matiereId, matiere: matiereName(t.matiereId), classes: [cl.name], responses: 0, visible: false, overall: null, criteria: [], items: [], comments: [] })
+      }
+    }
+    rows.sort((a, b) => a.teacher.localeCompare(b.teacher) || a.matiere.localeCompare(b.matiere))
+    const students = db.users.filter((u) => u.role === 'student' && u.active && u.classeId === cl.id).length
+    const expected = students * classTeaching(cl.id).length
+    // Chiffres de la classe : seulement à partir de EVAL_MIN_RESPONSES réponses (anonymat)
+    const visible = responses.length >= EVAL_MIN_RESPONSES
+    const items = visible ? evalItems(responses, questions.filter((q) => q.type === 'note' || q.type === 'qcm')) : []
+    const criteria = items.filter((q) => q.type === 'note')
+    const notes = criteria.map((q) => q.average).filter((x) => x !== null)
+    return {
+      campaign: { id: c.id, title: c.title, status: c.status, open: evalOpen(c) }, minResponses: EVAL_MIN_RESPONSES, rows,
+      classe: {
+        classeId: cl.id, classe: cl.name, students, teachers: classTeaching(cl.id).length, expected, responses: responses.length,
+        participation: expected ? Math.round((responses.length / expected) * 1000) / 10 : 0,
+        visible, overall: notes.length ? Math.round((notes.reduce((s, x) => s + x, 0) / notes.length) * 100) / 100 : null,
+        criteria, qcm: items.filter((q) => q.type === 'qcm'),
+        evaluated: rows.filter((r) => r.responses > 0).length,
+      },
+    }
+  }
+  const responses = await platform.store.query('evalResponses', user.role === 'teacher' ? { campaignId: c.id, teacherId: user.id } : { campaignId: c.id })
   const out = { campaign: { ...clone(c), questions, periode: db.periodes.find((p) => p.id === c.periodeId)?.name ?? '', open: evalOpen(c) }, criteria: questions, minResponses: EVAL_MIN_RESPONSES, rows: evalAggregate(responses, questions) }
   if (user.role === 'pedagogy') out.dashboard = evalDashboard(responses, questions)
   return out

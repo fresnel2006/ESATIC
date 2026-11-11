@@ -142,18 +142,131 @@ function CampaignForm({ campaign, periodes, onClose, onSaved }) {
   )
 }
 
-function Dashboard({ campaignId }) {
-  const { data, loading, error } = useAsync(() => api.evalResults(campaignId), [campaignId])
+const pctTone = (pct) => (pct >= 50 ? 'good' : pct >= 20 ? 'mid' : 'low')
+
+// Enseignants (et matières) avec leur moyenne, triables, et fiche détaillée au clic
+function TeachersTable({ rows: list, minResponses, title, showClasses }) {
   const [detail, setDetail] = useState(null)
   const [sort, setSort] = useState('overall')
+  const rows = [...list].sort((a, b) => (sort === 'overall' ? (b.overall ?? -1) - (a.overall ?? -1) : sort === 'responses' ? b.responses - a.responses : a.teacher.localeCompare(b.teacher)))
+  return (
+    <div className="card">
+      <div className="card-header">
+        <h2>{title}</h2>
+        <select className="select" style={{ width: 'auto', minHeight: 34 }} value={sort} onChange={(e) => setSort(e.target.value)} aria-label="Trier">
+          <option value="overall">Trier par moyenne</option>
+          <option value="responses">Trier par nombre de réponses</option>
+          <option value="name">Trier par nom</option>
+        </select>
+      </div>
+      <ResponsiveTable
+        rowKey="key"
+        rows={rows.map((r) => ({ ...r, key: `${r.teacherId}-${r.matiereId}` }))}
+        onRowClick={(r) => r.responses > 0 && setDetail(r)}
+        empty={<Empty icon={ClipboardCheck} title="Aucun enseignant">L'administration affecte les enseignants aux classes (fiche de l'enseignant).</Empty>}
+        columns={[
+          { key: 'teacher', label: 'Enseignant', primary: true, render: (r) => <span><strong style={{ fontWeight: 600 }}>{r.teacher}</strong><span className="small muted" style={{ display: 'block' }}>{r.matiere}</span></span> },
+          ...(showClasses ? [{ key: 'classes', label: 'Classes', hideMobile: true, render: (r) => <span className="small">{r.classes.join(', ')}</span> }] : []),
+          { key: 'responses', label: 'Réponses' },
+          { key: 'overall', label: 'Moyenne', render: (r) => (r.visible ? <ScoreBadge value={r.overall} />
+            : r.responses === 0 ? <span className="small muted">Pas encore évalué</span>
+              : <span className="small muted"><Lock size={13} /> moins de {minResponses}</span>) },
+          { key: 'actions', label: '', className: 'actions', render: (r) => r.responses > 0 && <button className="btn btn-ghost btn-sm" onClick={(e) => { e.stopPropagation(); setDetail(r) }}>Détail</button> },
+        ]}
+      />
+      {detail && (
+        <Modal wide title={`${detail.teacher} - ${detail.matiere}${showClasses ? '' : ` (${detail.classes.join(', ')})`}`} onClose={() => setDetail(null)} footer={<button className="btn btn-primary" onClick={() => setDetail(null)}>Fermer</button>}>
+          <EvalResultCard row={detail} minResponses={minResponses} />
+        </Modal>
+      )}
+    </div>
+  )
+}
+
+// Une classe : participation, moyennes de la classe et évaluation de chacun de ses enseignants (réponses de la
+// classe seulement)
+function ClassView({ campaignId, classeId }) {
+  const { data, loading, error } = useAsync(() => api.evalResults(campaignId, classeId), [campaignId, classeId])
+  if (error) return <ErrorBox error={error} />
+  if (loading && !data) return <Loader />
+  const k = data.classe
+  return (
+    <div className="stack">
+      <div className="grid-cards">
+        <Stat icon={Users} value={`${k.responses} / ${k.expected}`} label={`Évaluations reçues / attendues · ${k.students} étudiant(s)`} />
+        <Stat icon={Percent} value={`${String(k.participation).replace('.', ',')} %`} label="Participation de la classe" tone={k.participation >= 50 ? 'green' : k.participation >= 20 ? '' : 'red'} />
+        <Stat icon={Star} value={k.overall === null ? '-' : `${fmt5(k.overall)} / 5`} label="Moyenne de la classe" tone="green" />
+        <Stat icon={ClipboardCheck} value={`${k.evaluated} / ${k.teachers}`} label="Enseignants évalués" tone="gray" />
+      </div>
+      <TeachersTable rows={data.rows} minResponses={data.minResponses} title={`Enseignants de ${k.classe}`} />
+      {!k.visible ? (
+        <div className="eval-hidden"><Lock size={15} /> Moins de {data.minResponses} réponses dans cette classe : les moyennes de la classe restent masquées pour garantir l'anonymat.</div>
+      ) : (
+        <div className="eval-dash-grid">
+          <div className="card">
+            <div className="card-header"><h2>Moyenne de la classe par question</h2></div>
+            <div className="card-body"><div className="score-bars">{k.criteria.map((c) => <ScoreBar key={c.key} label={c.label} value={c.average} />)}</div></div>
+          </div>
+          {k.qcm.length > 0 && (
+            <div className="card">
+              <div className="card-header"><h2>Réponses aux QCM de la classe</h2></div>
+              <div className="card-body stack">{k.qcm.map((q) => <QcmResult key={q.key} item={q} />)}</div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Tableau de bord : par classe (vue principale) ou toute l'école
+function Dashboard({ campaignId }) {
+  const { data, loading, error } = useAsync(() => api.evalResults(campaignId), [campaignId])
+  const [params, setParams] = useSearchParams()
+  const view = params.get('vue') === 'ecole' ? 'ecole' : 'classe'
+  const setP = (p) => setParams((cur) => { const n = new URLSearchParams(cur); for (const [a, b] of Object.entries(p)) (b == null ? n.delete(a) : n.set(a, b)); return n }, { replace: true })
   if (error) return <ErrorBox error={error} />
   if (loading && !data) return <Loader />
   const d = data.dashboard
+  const classes = [...d.byClass].sort((a, b) => a.classe.localeCompare(b.classe, 'fr', { numeric: true }))
+  const classeId = Number(params.get('classe')) || classes[0]?.classeId
   const maxDist = Math.max(1, ...d.distribution.map((x) => x.count))
-  const rows = [...data.rows].sort((a, b) => (sort === 'overall' ? (b.overall ?? -1) - (a.overall ?? -1) : sort === 'responses' ? b.responses - a.responses : a.teacher.localeCompare(b.teacher)))
+
+  const tabs = (
+    <div className="eval-tabs" role="tablist">
+      <button role="tab" aria-selected={view === 'classe'} className={view === 'classe' ? 'on' : ''} onClick={() => setP({ vue: null })}>Par classe</button>
+      <button role="tab" aria-selected={view === 'ecole'} className={view === 'ecole' ? 'on' : ''} onClick={() => setP({ vue: 'ecole' })}>Toute l'école</button>
+    </div>
+  )
+
+  if (view === 'classe') return (
+    <div className="stack">
+      {tabs}
+      {!classes.length ? (
+        <div className="card"><Empty icon={Users} title="Aucune classe avec des enseignants affectés">L'administration affecte les enseignants à leurs classes (fiche de l'enseignant).</Empty></div>
+      ) : (
+        <>
+          <div className="eval-class-picker">
+            {classes.map((x) => {
+              const pct = x.expected ? Math.round((x.responses / x.expected) * 100) : 0
+              return (
+                <button key={x.classeId} className={`eval-class ${x.classeId === classeId ? 'active' : ''}`} onClick={() => setP({ classe: x.classeId })}>
+                  <strong>{x.classe}</strong>
+                  <span className="small muted">{x.teachers} enseignant{x.teachers > 1 ? 's' : ''} · {x.responses} / {x.expected}</span>
+                  <span className="eval-rate"><span className="score-bar-track"><span className={`score-bar-fill ${pctTone(pct)}`} style={{ width: `${pct}%` }} /></span><b>{pct} %</b></span>
+                </button>
+              )
+            })}
+          </div>
+          {classeId && <ClassView key={classeId} campaignId={campaignId} classeId={classeId} />}
+        </>
+      )}
+    </div>
+  )
 
   return (
     <div className="stack">
+      {tabs}
       <div className="grid-cards">
         <Stat icon={Users} value={`${d.responses} / ${d.expected}`} label="Évaluations reçues / attendues" />
         <Stat icon={Percent} value={`${String(d.participation).replace('.', ',')} %`} label="Taux de participation" tone={d.participation >= 50 ? 'green' : d.participation >= 20 ? '' : 'red'} />
@@ -196,7 +309,8 @@ function Dashboard({ campaignId }) {
         <div className="card-header"><h2>Participation par classe</h2><span className="small muted">{d.byClass.length} classe(s) concernée(s)</span></div>
         <ResponsiveTable
           rowKey="classeId"
-          rows={d.byClass}
+          rows={classes}
+          onRowClick={(x) => setP({ vue: null, classe: x.classeId })}
           empty={<Empty icon={Users} title="Aucune classe avec des enseignants affectés">L'administration affecte les enseignants à leurs classes (fiche de l'enseignant).</Empty>}
           columns={[
             { key: 'classe', label: 'Classe', primary: true, render: (x) => <strong style={{ fontWeight: 600 }}>{x.classe}</strong> },
@@ -211,34 +325,7 @@ function Dashboard({ campaignId }) {
         />
       </div>
 
-      <div className="card">
-        <div className="card-header">
-          <h2>Enseignants</h2>
-          <select className="select" style={{ width: 'auto', minHeight: 34 }} value={sort} onChange={(e) => setSort(e.target.value)} aria-label="Trier">
-            <option value="overall">Trier par moyenne</option>
-            <option value="responses">Trier par nombre de réponses</option>
-            <option value="name">Trier par nom</option>
-          </select>
-        </div>
-        <ResponsiveTable
-          rowKey="key"
-          rows={rows.map((r) => ({ ...r, key: `${r.teacherId}-${r.matiereId}` }))}
-          onRowClick={setDetail}
-          empty={<Empty icon={ClipboardCheck} title="Aucune réponse pour le moment" />}
-          columns={[
-            { key: 'teacher', label: 'Enseignant', primary: true, render: (r) => <span><strong style={{ fontWeight: 600 }}>{r.teacher}</strong><span className="small muted" style={{ display: 'block' }}>{r.matiere}</span></span> },
-            { key: 'classes', label: 'Classes', hideMobile: true, render: (r) => <span className="small">{r.classes.join(', ')}</span> },
-            { key: 'responses', label: 'Réponses' },
-            { key: 'overall', label: 'Moyenne', render: (r) => (r.visible ? <ScoreBadge value={r.overall} /> : <span className="small muted"><Lock size={13} /> moins de {data.minResponses}</span>) },
-            { key: 'actions', label: '', className: 'actions', render: (r) => <button className="btn btn-ghost btn-sm" onClick={(e) => { e.stopPropagation(); setDetail(r) }}>Détail</button> },
-          ]}
-        />
-      </div>
-      {detail && (
-        <Modal wide title={`${detail.teacher} - ${detail.matiere}`} onClose={() => setDetail(null)} footer={<button className="btn btn-primary" onClick={() => setDetail(null)}>Fermer</button>}>
-          <EvalResultCard row={detail} minResponses={data.minResponses} />
-        </Modal>
-      )}
+      <TeachersTable rows={data.rows} minResponses={data.minResponses} title="Enseignants (toutes classes confondues)" showClasses />
     </div>
   )
 }

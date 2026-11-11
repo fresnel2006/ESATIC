@@ -990,3 +990,11 @@ h2, h3 { font-weight: 600; }
 .eval-qcm-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 22px; }
 .score-bar-fill.qcm { background: var(--primary); }
 @media (max-width: 640px) { .eval-q-row { flex-wrap: wrap; } .eval-q-type { flex: 1; } .eval-choices, .eval-q-options { padding-left: 0; } .eval-criterion.column .textarea { margin-left: 0; width: 100%; } }
+.eval-tabs { display: inline-flex; gap: 4px; padding: 4px; background: var(--bg-soft, rgba(0, 80, 160, 0.06)); border-radius: 10px; align-self: flex-start; }
+.eval-tabs button { border: 0; background: transparent; font: inherit; font-weight: 500; padding: 8px 16px; border-radius: 8px; cursor: pointer; color: var(--text-2, inherit); }
+.eval-tabs button.on { background: var(--surface, #fff); color: var(--primary); font-weight: 600; box-shadow: 0 1px 4px rgba(4, 32, 64, 0.12); }
+.eval-class-picker { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; }
+.eval-class { display: flex; flex-direction: column; gap: 4px; text-align: left; font: inherit; padding: 12px 14px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface, #fff); cursor: pointer; transition: border-color .15s, box-shadow .15s; }
+.eval-class:hover { border-color: var(--primary); }
+.eval-class.active { border-color: var(--primary); box-shadow: 0 0 0 2px var(--primary) inset; }
+.eval-class .eval-rate { margin-top: 4px; }
