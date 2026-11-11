@@ -30,9 +30,9 @@
   --sidebar-hover: rgba(255, 255, 255, 0.1);
   --sidebar-active: rgba(255, 255, 255, 0.18);
 
-  --radius-sm: 6px;
-  --radius: 10px;
-  --radius-lg: 14px;
+  --radius-sm: 0;
+  --radius: 0;
+  --radius-lg: 0;
   --shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.06);
   --shadow: 0 2px 8px rgba(16, 24, 40, 0.08);
   --shadow-lg: 0 12px 32px rgba(16, 24, 40, 0.16);
@@ -154,7 +154,7 @@ textarea {
   gap: 8px;
   min-height: 38px;
   padding: 0 16px;
-  border-radius: var(--radius-sm);
+  border-radius: 0;
   border: 1px solid transparent;
   font-weight: 500;
   font-size: 0.92rem;
@@ -180,7 +180,7 @@ textarea {
 .btn-block { width: 100%; }
 .icon-btn {
   display: inline-flex; align-items: center; justify-content: center;
-  width: 38px; height: 38px; border-radius: var(--radius-sm);
+  width: 38px; height: 38px; border-radius: 0;
   border: none; background: transparent; color: var(--text-2); cursor: pointer;
   position: relative;
 }
@@ -195,7 +195,7 @@ textarea {
   min-height: 40px;
   padding: 8px 12px;
   border: 1px solid var(--border-strong);
-  border-radius: var(--radius-sm);
+  border-radius: 0;
   background: var(--surface);
   font-size: 0.92rem;
 }
@@ -225,7 +225,7 @@ textarea {
 .card {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
+  border-radius: 0;
   box-shadow: var(--shadow-sm);
 }
 .card-body { padding: 18px 20px; }
@@ -245,7 +245,7 @@ textarea {
 /* ---------- Statuts ---------- */
 .badge {
   display: inline-flex; align-items: center; gap: 6px;
-  padding: 2px 10px; border-radius: 999px;
+  padding: 2px 10px; border-radius: 0;
   font-size: 0.76rem; font-weight: 500; white-space: nowrap;
 }
 .badge::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
@@ -258,7 +258,7 @@ textarea {
 /* ---------- Onglets en pilules (maquette Devoirs) ---------- */
 .pills { display: flex; flex-wrap: wrap; gap: 10px; }
 .pill {
-  min-height: 30px; padding: 0 18px; border-radius: 8px;
+  min-height: 30px; padding: 0 18px; border-radius: 0;
   border: 1px solid var(--primary); background: transparent; color: var(--text);
   font-size: 0.82rem; font-weight: 500; cursor: pointer;
 }
@@ -316,7 +316,7 @@ textarea {
 }
 .modal {
   width: 100%; max-width: 560px; max-height: calc(100vh - 32px); overflow: auto;
-  background: var(--surface); border-radius: var(--radius-lg); box-shadow: var(--shadow-lg);
+  background: var(--surface); border-radius: 0; box-shadow: var(--shadow-lg);
 }
 .modal.wide { max-width: 860px; }
 .modal-head { display: flex; align-items: center; justify-content: space-between; padding: 18px 22px; border-bottom: 1px solid var(--border); }
@@ -326,7 +326,7 @@ textarea {
 /* ---------- Notifications éphémères ---------- */
 .toasts { position: fixed; right: 16px; bottom: 16px; display: flex; flex-direction: column; gap: 8px; z-index: 200; }
 .toast {
-  min-width: 260px; max-width: 380px; padding: 12px 16px; border-radius: var(--radius);
+  min-width: 260px; max-width: 380px; padding: 12px 16px; border-radius: 0;
   background: var(--text); color: var(--surface); box-shadow: var(--shadow-lg); font-size: 0.9rem;
 }
 .toast.error { background: var(--danger); color: #fff; }
@@ -336,7 +336,7 @@ textarea {
 /* ---------- Encadrés d'information ---------- */
 .notice {
   display: flex; gap: 12px; align-items: flex-start;
-  padding: 12px 16px; border-radius: var(--radius); font-size: 0.9rem;
+  padding: 12px 16px; border-radius: 0; font-size: 0.9rem;
   background: var(--info-soft); color: var(--text-2);
 }
 .notice svg { flex-shrink: 0; color: var(--info); margin-top: 2px; }
@@ -345,9 +345,9 @@ textarea {
 .notice.success { background: var(--success-soft); }
 .notice.success svg { color: var(--success); }
 
-.kbd { font-family: var(--font-mono); font-size: 0.8rem; padding: 1px 6px; border: 1px solid var(--border-strong); border-radius: 4px; background: var(--surface-2); }
+.kbd { font-family: var(--font-mono); font-size: 0.8rem; padding: 1px 6px; border: 1px solid var(--border-strong); border-radius: 0; background: var(--surface-2); }
 .code-block {
   font-family: var(--font-mono); font-size: 0.84rem;
-  background: #0f1720; color: #dbe4ee; padding: 12px 14px; border-radius: var(--radius-sm);
+  background: #0f1720; color: #dbe4ee; padding: 12px 14px; border-radius: 0;
   white-space: pre-wrap; word-break: break-word; margin: 0; max-height: 320px; overflow: auto;
 }
