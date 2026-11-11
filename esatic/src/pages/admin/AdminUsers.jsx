@@ -234,7 +234,7 @@ function ImportModal({ kind, classes, matieres, onClose, onDone }) {
           {rows && (
             <>
               <p className="small muted">Aperçu : {rows.length} ligne(s)</p>
-              <div className="table-wrap" style={{ maxHeight: 260, overflow: 'auto', border: '1px solid var(--border)' }}>
+              <div className="table-wrap" style={{ maxHeight: 260, overflow: 'auto', border: '1px solid var(--border)', borderRadius: 8 }}>
                 <table className="table">
                   <thead><tr>{cfg.columns.map(([, label]) => <th key={label}>{label}</th>)}</tr></thead>
                   <tbody>{rows.slice(0, 50).map((r, i) => <tr key={i}>{cfg.columns.map(([key]) => <td key={key}>{r[key]}</td>)}</tr>)}</tbody>
