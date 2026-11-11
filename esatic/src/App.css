@@ -1118,3 +1118,19 @@ h2, h3 { font-weight: 600; }
 .eval-level-title { font-weight: 600; font-size: 0.95rem; color: var(--primary); padding-bottom: 4px; border-bottom: 1px solid var(--border); }
 .eval-class.no-data { background: var(--bg-soft, #f6f7f9); }
 .eval-class.no-data strong { color: var(--text-2, inherit); }
+
+/* Fiche détaillée d'un enseignant (évaluation) : section dédiée */
+.teacher-detail { display: flex; flex-direction: column; gap: 16px; scroll-margin-top: 80px; }
+.td-bar { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.td-path { display: inline-flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.td-path b { color: var(--text); font-weight: 600; }
+.td-head { display: flex; align-items: center; gap: 18px; padding: 22px 24px; border-top: 3px solid var(--primary); flex-wrap: wrap; }
+.td-id { flex: 1; min-width: 200px; display: flex; flex-direction: column; gap: 8px; }
+.td-id h2 { margin: 0; font-size: 1.35rem; }
+.td-tags { display: flex; gap: 6px; flex-wrap: wrap; }
+.td-score { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+.td-notes { display: flex; flex-direction: column; gap: 4px; }
+.td-note { display: grid; grid-template-columns: minmax(0, 1fr) 92px; align-items: center; gap: 12px; }
+.td-compare { font-size: 0.8rem; color: var(--text-3); text-align: right; white-space: nowrap; }
+.teacher-detail .stat .k { white-space: normal; }
+@media (max-width: 640px) { .td-score { align-items: flex-start; } .td-note { grid-template-columns: 1fr; gap: 2px; } .td-compare { text-align: left; } }

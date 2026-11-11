@@ -1,12 +1,12 @@
 // Direction pédagogique : évaluation des enseignants par les étudiants (seul rôle qui voit ce tableau de bord).
 // Campagnes (ouverture, dates, clôture) et tableau de bord : participation, moyennes de l'école par critère,
 // répartition des notes, participation par classe, classement des enseignants et fiche détaillée de chacun.
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { ClipboardCheck, Plus, Users, Percent, Star, MessageSquare, Lock, LockOpen, Pencil, Trash2, Send, ShieldCheck, ArrowUp, ArrowDown, X } from 'lucide-react'
+import { ClipboardCheck, Plus, Users, Percent, Star, MessageSquare, Lock, LockOpen, Pencil, Trash2, Send, ShieldCheck, ArrowUp, ArrowDown, X, ArrowLeft, ChevronRight, TrendingUp, TrendingDown, Scale, MessageSquareQuote } from 'lucide-react'
 import * as api from '../api/index.js'
 import { useToast } from '../context/ToastContext.jsx'
-import { Empty, ErrorBox, Loader, Modal, Notice, PageHead, ResponsiveTable, Stat, StatusBadge, useAsync, ICON } from '../components/ui.jsx'
+import { Avatar, Empty, ErrorBox, Loader, Modal, Notice, PageHead, ResponsiveTable, Stat, StatusBadge, useAsync, ICON } from '../components/ui.jsx'
 import { EVAL_TYPE_LABELS, EvalResultCard, QcmResult, ScoreBadge, ScoreBar, fmt5 } from '../components/EvalWidgets.jsx'
 import { fmtDateTime, fromLocalInput, toLocalInput } from '../lib/format.js'
 import { LEVELS, LEVEL_NAMES } from '../api/seed.js'
@@ -145,9 +145,110 @@ function CampaignForm({ campaign, periodes, onClose, onSaved }) {
 
 const pctTone = (pct) => (pct >= 50 ? 'good' : pct >= 20 ? 'mid' : 'low')
 
-// Enseignants (et matières) avec leur moyenne, triables, et fiche détaillée au clic
-function TeachersTable({ rows: list, minResponses, title, showClasses }) {
+// Regroupe les résultats par partie : [{ title, items }]
+function byPart(items) {
+  const parts = []
+  for (const q of items) {
+    if (q.type === 'partie') parts.push({ title: q.label, items: [] })
+    else {
+      if (!parts.length) parts.push({ title: 'Questions', items: [] })
+      parts[parts.length - 1].items.push(q)
+    }
+  }
+  return parts.filter((p) => p.items.length)
+}
+
+// Fiche détaillée d'un enseignant (dans une classe, ou toutes classes confondues) : section dédiée de la page
+function TeacherDetail({ row, minResponses, scope, students, classCriteria = [], onBack }) {
+  const ref = useRef(null)
+  useEffect(() => { ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }) }, [row.teacherId, row.matiereId])
+  const notes = (row.items || row.criteria || []).filter((q) => q.type === 'note' && q.average !== null)
+  const best = notes.length ? notes.reduce((a, b) => (b.average > a.average ? b : a)) : null
+  const worst = notes.length ? notes.reduce((a, b) => (b.average < a.average ? b : a)) : null
+  const classAvg = Object.fromEntries(classCriteria.map((c) => [c.label, c.average]))
+  const classOverall = classCriteria.length ? classCriteria.reduce((s, c) => s + (c.average || 0), 0) / classCriteria.length : null
+  const diff = row.overall !== null && classOverall !== null ? Math.round((row.overall - classOverall) * 10) / 10 : null
+
+  return (
+    <section className="teacher-detail" ref={ref} aria-label={`Évaluation de ${row.teacher}`}>
+      <div className="td-bar">
+        <button className="btn btn-secondary btn-sm" onClick={onBack}><ArrowLeft size={15} /> Retour {scope ? `à ${scope}` : ''}</button>
+        <span className="small muted td-path">Évaluation des enseignants <ChevronRight size={13} /> {scope || 'Toute l\'école'} <ChevronRight size={13} /> <b>{row.teacher}</b></span>
+      </div>
+
+      <div className="card td-head">
+        <Avatar name={row.teacher} size={64} />
+        <div className="td-id">
+          <h2>{row.teacher}</h2>
+          <div className="td-tags"><span className="tag">{row.matiere}</span>{row.classes.map((c) => <span key={c} className="tag">{c}</span>)}</div>
+        </div>
+        <div className="td-score">
+          {row.visible ? <ScoreBadge value={row.overall} size="lg" /> : <span className="small muted"><Lock size={14} /> Masqué</span>}
+          <span className="small muted">{row.responses} réponse{row.responses > 1 ? 's' : ''}{students ? ` sur ${students} étudiant${students > 1 ? 's' : ''}` : ''}</span>
+        </div>
+      </div>
+
+      {!row.visible ? (
+        <div className="card"><Empty icon={Lock} title="Résultats masqués">Moins de {minResponses} réponses{scope ? ` dans ${scope}` : ''} : les résultats de cet enseignant restent masqués pour garantir l'anonymat des étudiants.</Empty></div>
+      ) : (
+        <>
+          <div className="grid-cards">
+            <Stat icon={Users} value={students ? `${Math.round((row.responses / students) * 100)} %` : row.responses} label={students ? 'Participation des étudiants' : 'Réponses reçues'} />
+            <Stat icon={TrendingUp} value={best ? fmt5(best.average) : '-'} label={best ? `Point fort : ${best.label}` : 'Point fort'} tone="green" />
+            <Stat icon={TrendingDown} value={worst ? fmt5(worst.average) : '-'} label={worst ? `À améliorer : ${worst.label}` : 'À améliorer'} tone="red" />
+            <Stat icon={Scale} value={diff === null ? '-' : `${diff > 0 ? '+' : ''}${String(diff).replace('.', ',')}`} label={scope ? `Écart avec la moyenne de ${scope}` : 'Écart avec la moyenne'} tone="gray" />
+          </div>
+
+          {byPart(row.items || row.criteria || []).map((p) => {
+            const stars = p.items.filter((q) => q.type === 'note')
+            const qcm = p.items.filter((q) => q.type === 'qcm')
+            const open = p.items.filter((q) => q.type === 'texte')
+            return (
+              <div className="card" key={p.title}>
+                <div className="card-header"><h2>{p.title}</h2></div>
+                <div className="card-body stack">
+                  {stars.length > 0 && (
+                    <div className="td-notes">
+                      {stars.map((q) => (
+                        <div key={q.key} className="td-note">
+                          <ScoreBar label={q.label} value={q.average} />
+                          {classAvg[q.label] != null && <span className="td-compare">Classe : {fmt5(classAvg[q.label])}</span>}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {qcm.length > 0 && <div className="eval-qcm-grid">{qcm.map((q) => <QcmResult key={q.key} item={q} />)}</div>}
+                  {open.map((q) => (
+                    <div key={q.key} className="stack-sm">
+                      <span className="eval-q-label">{q.label} <span className="small muted">({q.answers.length} réponse{q.answers.length > 1 ? 's' : ''})</span></span>
+                      {q.answers.length
+                        ? <div className="eval-comments">{q.answers.map((a, i) => <blockquote key={i} className="eval-comment"><MessageSquareQuote size={15} />{a}</blockquote>)}</div>
+                        : <span className="small muted">Aucune réponse écrite.</span>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )
+          })}
+
+          <div className="card">
+            <div className="card-header"><h2>Commentaires libres</h2><span className="small muted">{row.comments.length} commentaire{row.comments.length > 1 ? 's' : ''}, dans un ordre mélangé</span></div>
+            <div className="card-body">
+              {row.comments.length
+                ? <div className="eval-comments">{row.comments.map((c, i) => <blockquote key={i} className="eval-comment"><MessageSquareQuote size={15} />{c}</blockquote>)}</div>
+                : <span className="small muted">Aucun commentaire.</span>}
+            </div>
+          </div>
+        </>
+      )}
+    </section>
+  )
+}
+
+// Enseignants (et matières) avec leur moyenne, triables ; un clic ouvre la fiche détaillée (onOpen)
+function TeachersTable({ rows: list, minResponses, title, showClasses, onOpen }) {
   const [detail, setDetail] = useState(null)
+  const open = (r) => (onOpen ? onOpen(r) : setDetail(r))
   const [sort, setSort] = useState('overall')
   const rows = [...list].sort((a, b) => (sort === 'overall' ? (b.overall ?? -1) - (a.overall ?? -1) : sort === 'responses' ? b.responses - a.responses : a.teacher.localeCompare(b.teacher)))
   return (
@@ -163,7 +264,7 @@ function TeachersTable({ rows: list, minResponses, title, showClasses }) {
       <ResponsiveTable
         rowKey="key"
         rows={rows.map((r) => ({ ...r, key: `${r.teacherId}-${r.matiereId}` }))}
-        onRowClick={(r) => r.responses > 0 && setDetail(r)}
+        onRowClick={(r) => r.responses > 0 && open(r)}
         empty={<Empty icon={ClipboardCheck} title="Aucun enseignant">L'administration affecte les enseignants aux classes (fiche de l'enseignant).</Empty>}
         columns={[
           { key: 'teacher', label: 'Enseignant', primary: true, render: (r) => <span><strong style={{ fontWeight: 600 }}>{r.teacher}</strong><span className="small muted" style={{ display: 'block' }}>{r.matiere}</span></span> },
@@ -172,7 +273,7 @@ function TeachersTable({ rows: list, minResponses, title, showClasses }) {
           { key: 'overall', label: 'Moyenne', render: (r) => (r.visible ? <ScoreBadge value={r.overall} />
             : r.responses === 0 ? <span className="small muted">Pas encore évalué</span>
               : <span className="small muted"><Lock size={13} /> moins de {minResponses}</span>) },
-          { key: 'actions', label: '', className: 'actions', render: (r) => r.responses > 0 && <button className="btn btn-ghost btn-sm" onClick={(e) => { e.stopPropagation(); setDetail(r) }}>Détail</button> },
+          { key: 'actions', label: '', className: 'actions', render: (r) => r.responses > 0 && <button className="btn btn-ghost btn-sm" onClick={(e) => { e.stopPropagation(); open(r) }}>Voir le détail <ChevronRight size={14} /></button> },
         ]}
       />
       {detail && (
@@ -186,11 +287,15 @@ function TeachersTable({ rows: list, minResponses, title, showClasses }) {
 
 // Une classe : participation, moyennes de la classe et évaluation de chacun de ses enseignants (réponses de la
 // classe seulement)
-function ClassView({ campaignId, classeId }) {
+function ClassView({ campaignId, classeId, prof, setProf }) {
   const { data, loading, error } = useAsync(() => api.evalResults(campaignId, classeId), [campaignId, classeId])
   if (error) return <ErrorBox error={error} />
-  if (loading && !data) return <Loader variant="dashboard" />
+  if (loading && !data) return <Loader variant={prof ? 'detail' : 'dashboard'} />
   const k = data.classe
+  const selected = prof && data.rows.find((r) => `${r.teacherId}-${r.matiereId}` === prof)
+  if (selected) {
+    return <TeacherDetail row={selected} minResponses={data.minResponses} scope={k.classe} students={k.students} classCriteria={k.visible ? k.criteria : []} onBack={() => setProf(null)} />
+  }
   return (
     <div className="stack">
       <div className="grid-cards">
@@ -199,7 +304,7 @@ function ClassView({ campaignId, classeId }) {
         <Stat icon={Star} value={k.overall === null ? '-' : `${fmt5(k.overall)} / 5`} label="Moyenne de la classe" tone="green" />
         <Stat icon={ClipboardCheck} value={`${k.evaluated} / ${k.teachers}`} label="Enseignants évalués" tone="gray" />
       </div>
-      <TeachersTable rows={data.rows} minResponses={data.minResponses} title={`Enseignants de ${k.classe}`} />
+      <TeachersTable rows={data.rows} minResponses={data.minResponses} title={`Enseignants de ${k.classe}`} onOpen={(r) => setProf(`${r.teacherId}-${r.matiereId}`)} />
       {!k.visible ? (
         <div className="eval-hidden"><Lock size={15} /> Moins de {data.minResponses} réponses dans cette classe : les moyennes de la classe restent masquées pour garantir l'anonymat.</div>
       ) : (
@@ -225,9 +330,12 @@ function Dashboard({ campaignId }) {
   const { data, loading, error } = useAsync(() => api.evalResults(campaignId), [campaignId])
   const [params, setParams] = useSearchParams()
   const view = params.get('vue') === 'ecole' ? 'ecole' : 'classe'
-  const setP = (p) => setParams((cur) => { const n = new URLSearchParams(cur); for (const [a, b] of Object.entries(p)) (b == null ? n.delete(a) : n.set(a, b)); return n }, { replace: true })
+  const setP = (p, push = false) => setParams((cur) => { const n = new URLSearchParams(cur); for (const [a, b] of Object.entries(p)) (b == null ? n.delete(a) : n.set(a, b)); return n }, { replace: !push })
+  // Fiche d'un enseignant ouverte : inscrite dans l'adresse (le bouton Précédent du navigateur la referme)
+  const prof = params.get('prof')
+  const setProf = (v) => setP({ prof: v }, true)
   if (error) return <ErrorBox error={error} />
-  if (loading && !data) return <Loader variant="classes" />
+  if (loading && !data) return <Loader variant={prof ? 'detail' : 'classes'} />
   const d = data.dashboard
   const classes = [...d.byClass].sort((a, b) => a.classe.localeCompare(b.classe, 'fr', { numeric: true }))
   // Toutes les classes, rangées par niveau (L1 ... M2, prépas)
@@ -242,6 +350,15 @@ function Dashboard({ campaignId }) {
       <button role="tab" aria-selected={view === 'ecole'} className={view === 'ecole' ? 'on' : ''} onClick={() => setP({ vue: 'ecole' })}>Toute l'école</button>
     </div>
   )
+
+  if (view === 'classe' && prof && classeId) return (
+    <ClassView key={classeId} campaignId={campaignId} classeId={classeId} prof={prof} setProf={setProf} />
+  )
+
+  if (view === 'ecole' && prof) {
+    const row = data.rows.find((r) => `${r.teacherId}-${r.matiereId}` === prof)
+    if (row) return <TeacherDetail row={row} minResponses={data.minResponses} classCriteria={d.responses ? d.criteria : []} onBack={() => setProf(null)} />
+  }
 
   if (view === 'classe') return (
     <div className="stack">
@@ -258,7 +375,7 @@ function Dashboard({ campaignId }) {
                   {g.list.map((x) => {
                     const pct = x.expected ? Math.round((x.responses / x.expected) * 100) : 0
                     return (
-                      <button key={x.classeId} className={`eval-class ${x.classeId === classeId ? 'active' : ''} ${x.expected ? '' : 'no-data'}`} onClick={() => setP({ classe: x.classeId })}>
+                      <button key={x.classeId} className={`eval-class ${x.classeId === classeId ? 'active' : ''} ${x.expected ? '' : 'no-data'}`} onClick={() => setP({ classe: x.classeId, prof: null })}>
                         <strong>{x.classe}</strong>
                         <span className="small muted">{!x.teachers ? 'Aucun enseignant affecté' : !x.students ? `${x.teachers} enseignant${x.teachers > 1 ? 's' : ''} · aucun étudiant` : `${x.teachers} enseignant${x.teachers > 1 ? 's' : ''} · ${x.responses} / ${x.expected}`}</span>
                         <span className="eval-rate"><span className="score-bar-track"><span className={`score-bar-fill ${pctTone(pct)}`} style={{ width: `${pct}%` }} /></span><b>{x.expected ? `${pct} %` : '-'}</b></span>
@@ -269,7 +386,7 @@ function Dashboard({ campaignId }) {
               </div>
             ))}
           </div>
-          {classeId && <ClassView key={classeId} campaignId={campaignId} classeId={classeId} />}
+          {classeId && <ClassView key={classeId} campaignId={campaignId} classeId={classeId} prof={null} setProf={setProf} />}
         </>
       )}
     </div>
@@ -336,7 +453,7 @@ function Dashboard({ campaignId }) {
         />
       </div>
 
-      <TeachersTable rows={data.rows} minResponses={data.minResponses} title="Enseignants (toutes classes confondues)" showClasses />
+      <TeachersTable rows={data.rows} minResponses={data.minResponses} title="Enseignants (toutes classes confondues)" showClasses onOpen={(r) => setProf(`${r.teacherId}-${r.matiereId}`)} />
     </div>
   )
 }
