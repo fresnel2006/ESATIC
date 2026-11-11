@@ -1,6 +1,6 @@
 // Éditeur d'une question (assistant de création et banque de questions)
 import { lazy, Suspense, useState } from 'react'
-import { Plus, Trash2, ArrowUp, ArrowDown, Copy, EyeOff, Eye } from 'lucide-react'
+import { Plus, Trash2, ArrowUp, ArrowDown, Copy } from 'lucide-react'
 import { ICON, Loader, Notice } from './ui.jsx'
 import { isWriteOnly, LANGUAGES, QUESTION_TYPES } from '../lib/format.js'
 import { isEmptyDiagram } from './DiagramEditor.jsx'
@@ -30,7 +30,7 @@ function baseQuestion(type) {
   if (type === 'ouverte') { base.points = 4; base.data = { answerModel: '', maxWords: 200 } }
   if (type === 'code') {
     base.points = 4
-    base.data = { language: 'python', starter: '', timeLimitMs: 2000, tests: [{ id: rid(), name: 'Exemple', stdin: '', expected: '', points: 4, hidden: false }] }
+    base.data = { language: 'python', starter: '', timeLimitMs: 2000, tests: [{ id: rid(), name: 'Exemple 1', stdin: '', expected: '', points: 0, hidden: false }] }
   }
   if (type === 'sql') { base.points = 4; base.data = { schemaSql: '', seedSql: '', expectedQuery: '', orderMatters: false } }
   if (type === 'diagram') {
@@ -98,11 +98,11 @@ export default function QuestionEditor({ q, index, total, onChange, onRemove, on
   const langOptions = Object.entries(LANGUAGES).filter(([k]) => !languages || languages.includes(k) || k === q.data?.language)
   const set = (patch) => onChange({ ...q, ...patch })
   const setData = (patch) => onChange({ ...q, data: { ...q.data, ...patch } })
-  // Langage exécutable dans le navigateur : tests automatiques. Sinon (C++, Java, OCaml, pseudo-code) :
-  // correction à la main, barème saisi directement
+  // Code : toujours corrigé à la main, barème libre. Langage exécutable dans le navigateur : l'enseignant
+  // donne des exemples que l'étudiant vérifie avec « Tester les exemples ». Sinon (C++, Java, OCaml,
+  // pseudo-code) : ni exemples ni exécution.
   const execution = useExecution()
-  const autoTests = q.type === 'code' && (!execution.known || execution.canRun(q.data.language))
-  const testSum = autoTests ? (q.data.tests || []).reduce((s, t) => s + Number(t.points || 0), 0) : 0
+  const runnable = q.type === 'code' && (!execution.known || execution.canRun(q.data.language))
   const critSum = q.type === 'html' ? (q.data.criteria || []).reduce((s, c) => s + Number(c.points || 0), 0) : 0
 
   return (
@@ -117,8 +117,8 @@ export default function QuestionEditor({ q, index, total, onChange, onRemove, on
             type="number" min="0.5" step="0.5" className="input" style={{ width: 80, minHeight: 32 }}
             value={q.points}
             onChange={(e) => set({ points: e.target.value === '' ? '' : Number(e.target.value) })}
-            disabled={autoTests || q.type === 'html'}
-            title={autoTests ? 'Somme des points des tests' : q.type === 'html' ? 'Somme des critères' : undefined}
+            disabled={q.type === 'html'}
+            title={q.type === 'html' ? 'Somme des critères' : undefined}
           />
           pts
         </label>
@@ -187,13 +187,13 @@ export default function QuestionEditor({ q, index, total, onChange, onRemove, on
                   {langOptions.map(([k, v]) => <option key={k} value={k}>{v}{languages && !languages.includes(k) ? ' (non prévu pour la matière)' : ''}</option>)}
                 </select>
               </Field>
-              {autoTests && (
-                <Field label="Temps maximum par test (ms)">
+              {runnable && (
+                <Field label="Temps maximum d'exécution (ms)">
                   <input type="number" min="200" max="10000" step="100" className="input" value={q.data.timeLimitMs} onChange={(e) => setData({ timeLimitMs: Number(e.target.value) })} />
                 </Field>
               )}
             </div>
-            {!autoTests && (
+            {!runnable && (
               <Notice>
                 {isWriteOnly(q.data.language)
                   ? 'Pseudo-code : l\'étudiant écrit son algorithme dans l\'éditeur, sans l\'exécuter. Vous le corrigez à la main ; fixez le barème en haut de la question.'
@@ -207,39 +207,22 @@ export default function QuestionEditor({ q, index, total, onChange, onRemove, on
                 </Suspense>
               </div>
             </Field>
-            {autoTests && <div className="stack-sm">
-              <div className="row">
-                <span className="label">Tests automatiques</span>
-                <div className="spacer" />
-                <span className={`small ${Math.abs(testSum - q.points) > 0.001 ? 'error-text' : 'muted'}`}>Total : {testSum} pts</span>
-              </div>
-              <span className="hint">L'entrée est envoyée sur stdin ; la sortie est comparée à la sortie attendue (espaces de fin ignorés). Les tests cachés ne sont pas montrés à l'étudiant.</span>
+            {runnable && <div className="stack-sm">
+              <span className="label">Exemples donnés à l'étudiant</span>
+              <span className="hint">Entrée et sortie attendue : l'étudiant les voit et vérifie son programme avec « Tester les exemples ». Ils ne donnent pas la note : vous corrigez le code à la main, avec le barème en haut de la question.</span>
               {(q.data.tests || []).map((t) => {
-                const upd = (patch) => {
-                  const tests = q.data.tests.map((x) => (x.id === t.id ? { ...x, ...patch } : x))
-                  onChange({ ...q, points: tests.reduce((s, x) => s + Number(x.points || 0), 0), data: { ...q.data, tests } })
-                }
+                const upd = (patch) => setData({ tests: q.data.tests.map((x) => (x.id === t.id ? { ...x, ...patch, hidden: false } : x)) })
                 return (
-                  <div className="test-row" key={t.id}>
-                    <input className="input" value={t.name} placeholder="Nom du test" onChange={(e) => upd({ name: e.target.value })} aria-label="Nom du test" />
-                    <textarea className="textarea" value={t.stdin} placeholder="Entrée (stdin)" onChange={(e) => upd({ stdin: e.target.value })} aria-label="Entrée" />
+                  <div className="test-row example-row" key={t.id}>
+                    <input className="input" value={t.name} placeholder="Nom de l'exemple" onChange={(e) => upd({ name: e.target.value })} aria-label="Nom de l'exemple" />
+                    <textarea className="textarea" value={t.stdin} placeholder="Entrée (ce que l'utilisateur tape)" onChange={(e) => upd({ stdin: e.target.value })} aria-label="Entrée" />
                     <textarea className="textarea" value={t.expected} placeholder="Sortie attendue" onChange={(e) => upd({ expected: e.target.value })} aria-label="Sortie attendue" />
-                    <input type="number" min="0" step="0.5" className="input" value={t.points} onChange={(e) => upd({ points: Number(e.target.value) })} aria-label="Points" />
-                    <button className={`btn btn-sm ${t.hidden ? 'btn-secondary' : 'btn-ghost'}`} onClick={() => upd({ hidden: !t.hidden })} title={t.hidden ? 'Test caché' : 'Test visible par l\'étudiant'}>
-                      {t.hidden ? <><EyeOff size={14} /> Caché</> : <><Eye size={14} /> Visible</>}
-                    </button>
-                    <button className="icon-btn" disabled={q.data.tests.length <= 1} onClick={() => {
-                      const tests = q.data.tests.filter((x) => x.id !== t.id)
-                      onChange({ ...q, points: tests.reduce((s, x) => s + Number(x.points || 0), 0), data: { ...q.data, tests } })
-                    }} aria-label="Supprimer le test"><Trash2 {...ICON} /></button>
+                    <button className="icon-btn" onClick={() => setData({ tests: q.data.tests.filter((x) => x.id !== t.id) })} aria-label="Supprimer l'exemple"><Trash2 {...ICON} /></button>
                   </div>
                 )
               })}
               <div>
-                <button className="btn btn-ghost btn-sm" onClick={() => {
-                  const tests = [...q.data.tests, { id: rid(), name: `Test ${q.data.tests.length + 1}`, stdin: '', expected: '', points: 1, hidden: true }]
-                  onChange({ ...q, points: tests.reduce((s, x) => s + Number(x.points || 0), 0), data: { ...q.data, tests } })
-                }}><Plus size={14} /> Ajouter un test</button>
+                <button className="btn btn-ghost btn-sm" onClick={() => setData({ tests: [...(q.data.tests || []), { id: rid(), name: `Exemple ${(q.data.tests || []).length + 1}`, stdin: '', expected: '', points: 0, hidden: false }] })}><Plus size={14} /> Ajouter un exemple</button>
               </div>
             </div>}
           </>
@@ -253,14 +236,10 @@ export default function QuestionEditor({ q, index, total, onChange, onRemove, on
               onChange={(schemaSql, seedSql) => setData({ schemaSql, seedSql })}
             />
             <div className="span-2">
-              <Field label="Requête de référence" hint="Son résultat est comparé à celui de la requête de l'étudiant, sur une base de test neuve.">
+              <Field label="Requête attendue (corrigé, facultatif)" hint="Visible seulement par vous pendant la correction. La requête de l'étudiant est corrigée à la main.">
                 <textarea className="textarea mono" style={{ minHeight: 70 }} value={q.data.expectedQuery} onChange={(e) => setData({ expectedQuery: e.target.value })} />
               </Field>
             </div>
-            <label className="checkbox">
-              <input type="checkbox" checked={!!q.data.orderMatters} onChange={(e) => setData({ orderMatters: e.target.checked })} />
-              L'ordre des lignes compte
-            </label>
           </div>
         )}
 

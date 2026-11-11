@@ -127,7 +127,6 @@ function CodeQuestion({ q, value, onChange, onBigInsert }) {
                   Entrée : {t.stdin.replace(/\n/g, ' / ')} &nbsp;Sortie attendue : {t.expected}
                 </div>
               ))}
-              {q.data.hiddenTestCount > 0 && <div className="muted">+ {q.data.hiddenTestCount} test(s) caché(s) utilisés pour la note.</div>}
             </div>
           </div>
         </div>

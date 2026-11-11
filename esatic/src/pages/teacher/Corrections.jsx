@@ -66,9 +66,9 @@ export default function Corrections() {
               <strong>Outils de correction</strong>
               <div className="small muted">{toGrade} copie(s) à corriger - {current.resultsPublished ? 'notes publiées' : 'notes non publiées'}</div>
             </div>
-            <button className="btn btn-primary" disabled={!!progress} onClick={autoGradeAll} title="QCM, tests de code (cachés compris) et requêtes SQL">
+            <button className="btn btn-primary" disabled={!!progress} onClick={autoGradeAll} title="Les QCM sont notés automatiquement ; le code, le SQL, les questions ouvertes et les diagrammes se corrigent à la main">
               {progress ? <Loader2 {...ICON} className="spin" /> : <Zap {...ICON} />}
-              {progress ? `Correction ${progress.n}/${progress.total || '...'}` : 'Corriger automatiquement'}
+              {progress ? `Correction ${progress.n}/${progress.total || '...'}` : 'Corriger les QCM'}
             </button>
             <Link className="btn btn-secondary" to={`/enseignant/corrections/epreuve/${current.id}`}><ListOrdered {...ICON} /> Corriger par question</Link>
             <button className="btn btn-secondary" disabled={!!progress} onClick={async () => {

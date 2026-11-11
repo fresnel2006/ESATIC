@@ -876,7 +876,7 @@ h2, h3 { font-weight: 600; }
 .assign-chip button { display: inline-flex; border: 0; background: transparent; cursor: pointer; padding: 2px; border-radius: 999px; color: var(--text-2); }
 .assign-chip button:hover { background: rgba(0, 0, 0, 0.08); color: var(--danger, #b42318); }
 .assign-add { display: grid; gap: 10px; padding: 12px; border: 1px dashed var(--border-strong, var(--border)); border-radius: 8px; }
-.assign-levels { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }
+.assign-levels { display: grid; grid-template-columns: repeat(auto-fill, minmax(125px, 1fr)); gap: 10px; }
 .assign-level { display: grid; gap: 4px; align-content: start; }
 .assign-level-head { text-align: left; border: 0; background: transparent; font-weight: 700; cursor: pointer; padding: 0 0 2px; color: var(--text); }
 .assign-level-head .muted { font-weight: 400; font-size: 0.75rem; margin-left: 4px; }
@@ -894,3 +894,6 @@ h2, h3 { font-weight: 600; }
 /* Création d'épreuve : une ou plusieurs classes */
 .class-picker { display: grid; gap: 10px; padding: 12px; border: 1px solid var(--border); border-radius: 8px; }
 .class-picker-chosen { min-height: 20px; }
+
+/* Exemples d'une question de code : nom, entrée, sortie attendue, suppression */
+.test-row.example-row { grid-template-columns: 140px 1fr 1fr auto; }

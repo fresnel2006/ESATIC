@@ -7,7 +7,7 @@ import { useToast } from '../../context/ToastContext.jsx'
 import { AnswerView } from '../../components/AnswerView.jsx'
 import { DiagramView, isEmptyDiagram } from '../../components/DiagramEditor.jsx'
 import Statement from '../../components/Statement.jsx'
-import { ErrorBox, Loader, Notice, RiskBadge, StatusBadge, ICON } from '../../components/ui.jsx'
+import { ErrorBox, Loader, RiskBadge, StatusBadge, ICON } from '../../components/ui.jsx'
 import { EVENT_LABELS, QUESTION_TYPES, fmtDateTime, fmtTime, fmtNote } from '../../lib/format.js'
 
 function Corrige({ q }) {
@@ -15,7 +15,7 @@ function Corrige({ q }) {
   if (q.type === 'ouverte') return <div className="small" style={{ whiteSpace: 'pre-wrap' }}>{q.data.answerModel || <span className="muted">Pas de corrigé saisi.</span>}</div>
   if (q.type === 'code') return (
     <div className="stack-sm small">
-      {q.data.tests.map((t) => <div key={t.id} className="mono">{t.name} ({t.points} pts{t.hidden ? ', caché' : ''}) : {t.stdin.replace(/\n/g, ' / ')} → {t.expected}</div>)}
+      {(q.data.tests || []).length ? q.data.tests.map((t) => <div key={t.id} className="mono">{t.name} : {t.stdin.replace(/\n/g, ' / ')} → {t.expected}</div>) : <span className="muted">Pas d'exemple. Correction à la main.</span>}
     </div>
   )
   if (q.type === 'sql') return <pre className="code-block">{q.data.expectedQuery}</pre>
@@ -80,14 +80,14 @@ export default function CorrectionDetail() {
       setBusy(false)
     }
   }
-  const hasAuto = a.questions.some((q) => ['code', 'sql', 'qcm'].includes(q.type))
+  const hasAuto = a.questions.some((q) => q.type === 'qcm')
 
   async function runTests() {
     setTesting(true)
     try {
       const r = await api.autoGradeCopy(t.id)
       await loadCopy()
-      toast.success(`Correction automatique faite${r.skipped.length ? ` (non exécuté : ${r.skipped.join(', ')})` : ''}. Vérifiez puis enregistrez.`)
+      toast.success(`QCM corrigés (${r.graded}). Les autres questions se corrigent à la main ; enregistrez la copie ensuite.`)
     } catch (e) {
       toast.error(e.message)
     } finally {
@@ -114,8 +114,8 @@ export default function CorrectionDetail() {
           <StatusBadge status={t.status} />
           <span className="small muted">Risque</span> <RiskBadge value={risk} />
           {hasAuto && (
-            <button className="btn btn-primary btn-sm" disabled={testing} onClick={runTests} title="QCM, tous les tests de code (cachés compris), requêtes SQL">
-              {testing ? <Loader2 size={14} className="spin" /> : <Zap size={14} />} {testing ? 'Tests en cours...' : 'Corriger automatiquement'}
+            <button className="btn btn-primary btn-sm" disabled={testing} onClick={runTests} title="Les QCM sont notés automatiquement ; le code, le SQL, les questions ouvertes et les diagrammes se corrigent à la main">
+              {testing ? <Loader2 size={14} className="spin" /> : <Zap size={14} />} {testing ? 'Correction...' : 'Corriger les QCM'}
             </button>
           )}
         </div>
@@ -156,9 +156,6 @@ export default function CorrectionDetail() {
                   <span className="label">Copie de l'étudiant</span>
                   <AnswerView question={q} value={an.value} showCorrect />
                   <TestResults results={an.testResults} />
-                  {(q.type === 'code' || q.type === 'sql') && !an.testResults && an.value && (
-                    <Notice>Pas encore testé : cliquez sur « Corriger automatiquement » en haut de la copie. C++ et Java attendent le serveur de correction.</Notice>
-                  )}
                 </div>
                 <div className="stack-sm">
                   <span className="label">Corrigé</span>

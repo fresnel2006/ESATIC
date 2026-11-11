@@ -4,7 +4,7 @@
 // - dans le navigateur en mode démo, avec les données dans localStorage.
 // Ce qui dépend de l'endroit (stockage, jeton de session, hachage) passe par "platform".
 
-import { buildSeed, hashPassword, DEFAULT_TOOLS, applyDemoSections, schoolStructure, STRUCTURE_VERSION } from './seed.js'
+import { buildSeed, hashPassword, DEFAULT_TOOLS, applyDemoSections, schoolStructure, STRUCTURE_VERSION, LEVELS } from './seed.js'
 import { buildExtraExams } from './seedExams.js'
 import { TOOLS, SQL_LIMITS, sqlSizeKb, DIAGRAM_MAX_KB } from '../lib/format.js'
 import { TEST_MODE } from '../config.js'
@@ -141,6 +141,13 @@ function migrate() {
       for (const t of DEFAULT_TOOLS[m.code] || []) {
         if (Array.isArray(m.tools) && !m.tools.includes(t)) { m.tools.push(t); changed = true }
       }
+    }
+    // OCaml : langage des classes préparatoires (MP2I, MPI), avec sa propre matière
+    if (!db.matieres.some((m) => m.code === 'OCAML')) {
+      db.matieres.push({ id: nextId('matiere'), schoolId: db.school?.id ?? 1, code: 'OCAML', name: 'Programmation fonctionnelle (OCaml)', coefficient: 4, tools: ['ocaml'] })
+      const prog = db.matieres.find((m) => m.code === 'PROG')
+      if (prog?.tools?.includes('ocaml')) prog.tools = prog.tools.filter((t) => t !== 'ocaml')
+      changed = true
     }
     // Questions de démonstration dans un langage retiré (C#) : enlevées, épreuve renommée
     for (const a of db.assessments) {
@@ -850,7 +857,7 @@ export async function getAssessment(id) {
 // Classes et matières que l'enseignant peut viser
 // Classes et matières proposées à l'enseignant : toutes celles de l'école (L1 à M2).
 // `rows` : ses affectations (données par l'administration), pour mettre ses matières en premier.
-const LEVEL_ORDER = ['L1', 'L2', 'L3', 'M1', 'M2']
+const LEVEL_ORDER = LEVELS
 const byLevel = (a, b) => {
   const la = LEVEL_ORDER.indexOf(a.level); const lb = LEVEL_ORDER.indexOf(b.level)
   return (la < 0 ? 99 : la) - (lb < 0 ? 99 : lb) || a.name.localeCompare(b.name)
@@ -1601,23 +1608,10 @@ export async function autoGradeCopyWith(api, attemptId) {
 export async function autoGradeJobs(attemptId) {
   await load()
   const user = requireUser('teacher')
-  const { t, a } = teacherAttempt(user, attemptId)
-  const jobs = []
-  for (const q of a.questions) {
-    const value = t.answers[q.id]?.value
-    if (typeof value !== 'string' || !value.trim()) continue
-    // Seuls les langages exécutables dans le navigateur sont corrigés automatiquement ;
-    // les autres (C++, Java, OCaml, pseudo-code) restent à corriger à la main
-    const lang = q.data?.language
-    const inBrowser = TEST_MODE.runCodeInBrowser && BROWSER_LANGS.includes(lang)
-    if (q.type === 'code' && inBrowser) {
-      jobs.push({ questionId: q.id, kind: 'code', language: lang, code: value, timeLimitMs: q.data.timeLimitMs || 2000, tests: (q.data.tests || []).map((x) => ({ stdin: x.stdin })) })
-    }
-    if (q.type === 'sql') {
-      jobs.push({ questionId: q.id, kind: 'sql', schema: q.data.schemaSql, seed: q.data.seedSql, query: value, expected: q.data.expectedQuery, orderMatters: !!q.data.orderMatters })
-    }
-  }
-  return jobs
+  teacherAttempt(user, attemptId) // droits de l'enseignant sur la copie
+  // La correction automatique ne concerne que les QCM (notés sur le serveur, sans rien exécuter) :
+  // le code et le SQL sont corrigés à la main par l'enseignant.
+  return []
 }
 
 // Exécution des codes à corriger, dans le navigateur de l'enseignant
@@ -1639,7 +1633,8 @@ export async function runAutoGradeJobs(jobs) {
 }
 
 // Applique les résultats : la comparaison aux sorties attendues et les points restent calculés ici
-export async function applyAutoGrade(attemptId, outputs = {}) {
+// Les résultats d'exécution éventuellement envoyés (anciennes versions du site) sont ignorés
+export async function applyAutoGrade(attemptId) {
   await load()
   const user = requireUser('teacher')
   const { t, a } = teacherAttempt(user, attemptId)
@@ -1651,27 +1646,7 @@ export async function applyAutoGrade(attemptId, outputs = {}) {
       an.autoScore = ok ? Number(q.points) : 0
       report.graded++
     }
-    if (q.type === 'code') {
-      const lang = q.data.language
-      if (!an.value?.trim()) { an.autoScore = 0; an.testResults = []; report.graded++; continue }
-      const runs = outputs[q.id]
-      if (!Array.isArray(runs)) { report.skipped.push(`${TOOLS[lang]?.label ?? lang} (serveur)`); continue }
-      const results = (q.data.tests || []).map((test, i) => {
-        const r = runs[i] || { stdout: '', stderr: 'Non exécuté', timeout: false }
-        const passed = !r.timeout && !r.stderr && sameOutput(r.stdout, test.expected)
-        return { name: test.name, hidden: !!test.hidden, points: Number(test.points), passed, timeout: !!r.timeout, stdout: String(r.stdout || '').slice(0, 300), stderr: String(r.stderr || '').split('\n').slice(-1)[0] }
-      })
-      an.testResults = results
-      an.autoScore = round2(results.filter((r) => r.passed).reduce((s, r) => s + r.points, 0))
-      report.graded++
-    }
-    if (q.type === 'sql') {
-      if (!an.value?.trim()) { an.autoScore = 0; report.graded++; continue }
-      const r = outputs[q.id] || { match: false, stderr: 'Non exécuté' }
-      an.autoScore = r.match ? Number(q.points) : 0
-      an.testResults = [{ name: 'Résultat comparé à la requête de référence', points: Number(q.points), passed: !!r.match, stderr: String(r.stderr || '') }]
-      report.graded++
-    }
+    // Code, SQL, questions ouvertes, pages web et diagrammes : corrigés à la main par l'enseignant
   }
   t.autoGradedAt = now()
   save()

@@ -21,7 +21,8 @@ import { buildExtraExams } from './seedExams.js'
 
 // Filières et classes de l'ESATIC (année 2026-2027).
 // Les classes 1, 2 et 3 gardent leur numéro : les comptes et épreuves de démonstration y sont rattachés.
-const FILIERES = ['SRIT', 'TWIN', 'ENTD', 'CSIA', 'DASI', 'BIHAR', 'MBDS', 'SIGL', 'RTEL', 'ERIS', 'I4SEI']
+const FILIERES = ['SRIT', 'TWIN', 'ENTD', 'CSIA', 'DASI', 'BIHAR', 'MBDS', 'SIGL', 'RTEL', 'ERIS', 'I4SEI', 'PREPA']
+const FILIERE_NAMES = { PREPA: 'Classes préparatoires' }
 const MASTERS = ['BIHAR', 'MBDS', 'SIGL', 'RTEL', 'ERIS', 'CSIA']
 const CLASSES = [
   // [nom, filière, niveau]
@@ -33,13 +34,18 @@ const CLASSES = [
   ...MASTERS.map((m) => [`M2 ${m}`, m, 'M2']),
   // Ajoutées ensuite : toujours en fin de liste, pour ne pas changer le numéro des classes existantes
   ['I4SEI', 'I4SEI', 'L3'],
+  // Classes préparatoires (OCaml) : Prépa 1 = MP2I, Prépa 2 = MPI
+  ['MP2I', 'PREPA', 'Prépa 1'], ['MPI', 'PREPA', 'Prépa 2'],
 ]
 
+// Niveaux, dans l'ordre d'affichage (menus, cases à cocher, filtres)
+export const LEVELS = ['L1', 'L2', 'L3', 'M1', 'M2', 'Prépa 1', 'Prépa 2']
+
 // À augmenter à chaque ajout dans les listes ci-dessus : les bases existantes reçoivent les classes manquantes
-export const STRUCTURE_VERSION = 2
+export const STRUCTURE_VERSION = 3
 
 export function schoolStructure(year = '2026-2027') {
-  const filieres = FILIERES.map((code, i) => ({ id: i + 1, schoolId: 1, code, name: code }))
+  const filieres = FILIERES.map((code, i) => ({ id: i + 1, schoolId: 1, code, name: FILIERE_NAMES[code] || code }))
   const classes = CLASSES.map(([name, fil, level], i) => ({
     id: i + 1, schoolId: 1, name, level, year,
     code: name.replace(/^(M[12]) /, '$1-').replace(/ /g, ''),
@@ -86,7 +92,8 @@ export function applyDemoSections(a) {
 
 // Outils informatiques de chaque matière de démonstration (code de la matière -> outils)
 export const DEFAULT_TOOLS = {
-  PROG: ['c', 'cpp', 'java', 'ocaml'],
+  PROG: ['c', 'cpp', 'java'],
+  OCAML: ['ocaml'],
   BDD: ['sql'],
   WEB: ['html', 'javascript', 'php'],
   PY: ['python'],
@@ -119,6 +126,7 @@ export async function buildSeed(hash = hashPassword) {
     { id: 4, schoolId: SCHOOL, code: 'PY', name: 'Programmation Python', coefficient: 3, tools: DEFAULT_TOOLS.PY },
     { id: 5, schoolId: SCHOOL, code: 'ALGO', name: 'Algorithmique', coefficient: 4, tools: DEFAULT_TOOLS.ALGO },
     { id: 6, schoolId: SCHOOL, code: 'MATH', name: 'Mathématiques', coefficient: 2, tools: DEFAULT_TOOLS.MATH },
+    { id: 7, schoolId: SCHOOL, code: 'OCAML', name: 'Programmation fonctionnelle (OCaml)', coefficient: 4, tools: DEFAULT_TOOLS.OCAML },
   ]
   const periodes = [
     { id: 1, schoolId: SCHOOL, name: 'Semestre 1', start: '2026-10-01', end: '2027-02-15', active: true },

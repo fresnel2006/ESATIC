@@ -15,7 +15,7 @@ function Corrige({ q }) {
   if (q.type === 'qcm') return <span>{q.data.choices.filter((c) => q.data.correct.includes(c.id)).map((c) => c.text).join(', ')}</span>
   if (q.type === 'ouverte') return <span style={{ whiteSpace: 'pre-wrap' }}>{q.data.answerModel || 'Pas de corrigé saisi.'}</span>
   if (q.type === 'sql') return <pre className="code-block">{q.data.expectedQuery}</pre>
-  if (q.type === 'code') return <span>{q.data.tests.length} test(s) dont {q.data.tests.filter((t) => t.hidden).length} caché(s)</span>
+  if (q.type === 'code') return <span>{(q.data.tests || []).map((t) => `${t.stdin.replace(/\n/g, ' / ')} → ${t.expected}`).join(' ; ') || 'Correction à la main'}</span>
   if (q.type === 'diagram') return isEmptyDiagram(q.data.answerModelXml) ? <span className="small muted">Pas de corrigé type.</span> : <DiagramView value={q.data.answerModelXml} height={380} />
   if (q.type === 'html') return <span>{q.data.criteria.map((c) => `${c.label} (${c.points})`).join(', ')}</span>
   return null
