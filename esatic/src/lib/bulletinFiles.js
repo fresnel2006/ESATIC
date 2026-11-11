@@ -1,7 +1,7 @@
 // Fichiers des bulletins : envoi (lecture du fichier choisi) et ouverture / téléchargement
 import * as api from '../api/index.js'
 
-export const BULLETIN_ACCEPT = '.pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png'
+export const BULLETIN_ACCEPT = '.pdf,application/pdf'
 export const BULLETIN_MAX_BYTES = 2 * 1024 * 1024
 
 // Contenu d'un fichier choisi, encodé en base64 (sans l'en-tête "data:...;base64,")
@@ -15,7 +15,7 @@ export function readFileBase64(file) {
 }
 
 export function checkBulletinFile(file) {
-  if (!/\.(pdf|jpe?g|png)$/i.test(file.name)) return 'Format non accepté : PDF, JPG ou PNG.'
+  if (!/\.pdf$/i.test(file.name)) return 'Format non accepté : le bulletin doit être un fichier PDF.'
   if (file.size > BULLETIN_MAX_BYTES) return `Fichier trop lourd (${fmtSize(file.size)}) : 2 Mo au maximum.`
   if (!file.size) return 'Fichier vide.'
   return null

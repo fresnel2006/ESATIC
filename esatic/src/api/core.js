@@ -250,6 +250,9 @@ function migrate() {
   // Évaluation des enseignants (ajoutée après coup) : campagnes
   if (!Array.isArray(db.evalCampaigns)) { db.evalCampaigns = []; changed = true }
   if (db.seq.evalCampaign === undefined) { db.seq.evalCampaign = 0; changed = true }
+  // Emplois du temps (PDF déposés par la direction pédagogique)
+  if (!Array.isArray(db.timetables)) { db.timetables = []; changed = true }
+  if (db.seq.timetable === undefined) { db.seq.timetable = 0; changed = true }
   if (changed) save()
 }
 
@@ -2101,7 +2104,8 @@ const BULLETIN_TYPES = [
   { mime: 'image/png', ext: 'png', magic: [0x89, 0x50, 0x4e, 0x47] },
   { mime: 'image/jpeg', ext: 'jpg', magic: [0xff, 0xd8, 0xff] },
 ]
-const BULLETIN_STAFF = ['admin', 'educator']
+// Dépôt des bulletins (PDF) : direction pédagogique, éducateurs et administration
+const BULLETIN_STAFF = ['pedagogy', 'educator', 'admin']
 
 function decodeBase64(b64) {
   const bin = atob(String(b64 || ''))
@@ -2172,15 +2176,16 @@ export async function uploadBulletin(periodeId, studentId, file) {
   try { bytes = decodeBase64(file?.base64) } catch { throw new ApiError('Fichier illisible.') }
   if (!bytes.length) throw new ApiError('Le fichier est vide.')
   if (bytes.length > BULLETIN_MAX_BYTES) throw new ApiError(`Fichier trop lourd (${(bytes.length / 1048576).toFixed(1)} Mo) : 2 Mo au maximum. Enregistrez le bulletin en PDF ou réduisez la qualité du scan.`)
-  const type = BULLETIN_TYPES.find((t) => t.magic.every((x, i) => bytes[i] === x))
-  if (!type) throw new ApiError('Format non accepté : déposez un PDF, un JPG ou un PNG.')
+  // Nouveaux dépôts : PDF seulement (les anciens bulletins en image restent consultables)
+  const type = BULLETIN_TYPES.find((t) => t.mime === 'application/pdf' && t.magic.every((x, i) => bytes[i] === x))
+  if (!type) throw new ApiError('Format non accepté : le bulletin doit être un fichier PDF.')
   const key = await fileKey(bytes)
   await platform.files.put(key, bytes)
   const fileName = String(file?.name || `bulletin.${type.ext}`).replace(/[\\/:*?"<>|]+/g, '_').slice(0, 120)
 
   const existing = db.bulletins.find((x) => x.periodeId === p.id && x.studentId === s.id)
   if (existing) {
-    if (existing.fileKey !== key && !db.bulletins.some((x) => x !== existing && x.fileKey === existing.fileKey)) platform.files.remove(existing.fileKey)
+    if (existing.fileKey !== key && !db.bulletins.some((x) => x !== existing && x.fileKey === existing.fileKey) && !(db.timetables || []).some((t) => t.fileKey === existing.fileKey)) platform.files.remove(existing.fileKey)
     Object.assign(existing, { classeId: s.classeId, fileKey: key, fileName, mime: type.mime, size: bytes.length, version: (existing.version || 1) + 1, uploadedAt: now(), uploadedBy: actor.id })
   } else {
     db.bulletins.push({
@@ -2202,7 +2207,7 @@ export async function deleteBulletin(bulletinId) {
   const b = db.bulletins.find((x) => x.id === Number(bulletinId))
   if (!b) throw new ApiError('Bulletin introuvable.', 'not_found', 404)
   db.bulletins = db.bulletins.filter((x) => x !== b)
-  if (!db.bulletins.some((x) => x.fileKey === b.fileKey)) platform.files.remove(b.fileKey)
+  releaseFile(b.fileKey)
   const s = db.users.find((u) => u.id === b.studentId)
   const p = db.periodes.find((x) => x.id === b.periodeId)
   audit(actor, 'suppression_bulletin', s ? `${s.lastName} ${s.firstName} (${s.matricule})` : '', `${p?.name ?? ''} - ${b.fileName}`)
@@ -2234,6 +2239,147 @@ export async function studentBulletins() {
       fileName: b.fileName, mime: b.mime, size: b.size, version: b.version, uploadedAt: b.uploadedAt,
     }))
     .sort((x, y) => (y.uploadedAt > x.uploadedAt ? 1 : -1))
+}
+
+// ---------------------------------------------------------------------------
+// Emplois du temps (PDF)
+// La direction pédagogique (ou l'administration) dépose les emplois du temps en PDF. Un même PDF peut concerner
+// plusieurs classes et, au besoin, des enseignants nommément (emploi du temps personnel). Période de validité
+// facultative : sert à repérer l'emploi du temps « en cours ».
+// Étudiant : ceux de sa classe. Enseignant : les siens et ceux de ses classes, et il peut consulter toute classe.
+// ---------------------------------------------------------------------------
+
+const TIMETABLE_MAX_BYTES = 3 * 1024 * 1024
+const TIMETABLE_STAFF = ['pedagogy', 'admin']
+const PDF_MAGIC = [0x25, 0x50, 0x44, 0x46]
+
+const dayOf = (d) => (d ? String(d).slice(0, 10) : null)
+const timetableCurrent = (t) => {
+  const today = new Date().toISOString().slice(0, 10)
+  return (!t.validFrom || t.validFrom <= today) && (!t.validTo || t.validTo >= today)
+}
+const timetableInfo = (t) => ({
+  id: t.id, title: t.title, note: t.note || '',
+  classeIds: t.classeIds || [], classes: (t.classeIds || []).map((id) => db.classes.find((c) => c.id === id)?.name).filter(Boolean).sort((a, b) => a.localeCompare(b, 'fr', { numeric: true })),
+  teacherIds: t.teacherIds || [], teachers: (t.teacherIds || []).map((id) => fullName(id)).filter(Boolean).sort(),
+  validFrom: t.validFrom || null, validTo: t.validTo || null, current: timetableCurrent(t),
+  fileName: t.fileName, size: t.size, version: t.version || 1, uploadedAt: t.uploadedAt, uploadedBy: userName(t.uploadedBy),
+})
+// Plus récent d'abord, l'emploi du temps en cours avant les autres
+const timetableOrder = (a, b) => (Number(b.current) - Number(a.current)) || String(b.validFrom || b.uploadedAt).localeCompare(String(a.validFrom || a.uploadedAt)) || (b.uploadedAt > a.uploadedAt ? 1 : -1)
+
+// GET /api/timetables (direction pédagogique, administration) : tous les emplois du temps, et les choix possibles
+export async function listTimetables() {
+  await load()
+  requireUser(...TIMETABLE_STAFF)
+  const counts = {}
+  for (const u of db.users) if (u.role === 'student' && u.active) counts[u.classeId] = (counts[u.classeId] || 0) + 1
+  return clone({
+    items: (db.timetables || []).map(timetableInfo).sort(timetableOrder),
+    classes: db.classes.map((c) => ({ id: c.id, name: c.name, level: c.level, students: counts[c.id] || 0 })),
+    teachers: db.users.filter((u) => u.role === 'teacher' && u.active).map((u) => ({ id: u.id, name: `${u.lastName} ${u.firstName}` })).sort((a, b) => a.name.localeCompare(b.name)),
+    maxBytes: TIMETABLE_MAX_BYTES,
+  })
+}
+
+// POST/PUT /api/timetables { id?, title, note, classeIds, teacherIds, validFrom, validTo, file?: { name, base64 } }
+// Fichier obligatoire pour un nouveau dépôt ; en modification, un nouveau fichier remplace l'ancien.
+export async function saveTimetable(input = {}) {
+  await load()
+  const actor = requireUser(...TIMETABLE_STAFF)
+  db.timetables ||= []
+  const title = String(input.title || '').trim().slice(0, 120)
+  if (!title) throw new ApiError('Donnez un titre (par exemple : Semaine du 17 au 22 novembre).')
+  const classeIds = [...new Set((input.classeIds || []).map(Number))].filter((id) => db.classes.some((c) => c.id === id))
+  const teacherIds = [...new Set((input.teacherIds || []).map(Number))].filter((id) => db.users.some((u) => u.id === id && u.role === 'teacher'))
+  if (!classeIds.length && !teacherIds.length) throw new ApiError('Choisissez au moins une classe (ou un enseignant) concernée.')
+  const validFrom = dayOf(input.validFrom)
+  const validTo = dayOf(input.validTo)
+  if (validFrom && validTo && validTo < validFrom) throw new ApiError('La fin de validité doit être après le début.')
+  const existing = input.id ? (db.timetables.find((t) => t.id === Number(input.id)) || null) : null
+  if (input.id && !existing) throw new ApiError('Emploi du temps introuvable.', 'not_found', 404)
+
+  let file = null
+  if (input.file?.base64) {
+    let bytes
+    try { bytes = decodeBase64(input.file.base64) } catch { throw new ApiError('Fichier illisible.') }
+    if (!bytes.length) throw new ApiError('Le fichier est vide.')
+    if (bytes.length > TIMETABLE_MAX_BYTES) throw new ApiError(`Fichier trop lourd (${(bytes.length / 1048576).toFixed(1)} Mo) : 3 Mo au maximum. Réduisez la qualité à l'export du PDF.`)
+    if (!PDF_MAGIC.every((x, i) => bytes[i] === x)) throw new ApiError('Déposez un fichier PDF.')
+    const key = await fileKey(bytes)
+    await platform.files.put(key, bytes)
+    file = { fileKey: key, fileName: String(input.file.name || 'emploi-du-temps.pdf').replace(/[\\/:*?"<>|]+/g, '_').slice(0, 120), size: bytes.length }
+  } else if (!existing) throw new ApiError('Choisissez le fichier PDF de l\'emploi du temps.')
+
+  const fields = { title, note: String(input.note || '').trim().slice(0, 300), classeIds, teacherIds, validFrom, validTo }
+  let t = existing
+  if (existing) {
+    if (file && file.fileKey !== existing.fileKey) releaseFile(existing.fileKey, existing)
+    Object.assign(existing, fields, file ? { ...file, version: (existing.version || 1) + 1, uploadedAt: now(), uploadedBy: actor.id } : {})
+  } else {
+    t = { id: nextId('timetable'), schoolId: actor.schoolId, ...fields, ...file, version: 1, uploadedAt: now(), uploadedBy: actor.id }
+    db.timetables.push(t)
+  }
+  // Prévenir les étudiants des classes et les enseignants concernés (nouveau fichier seulement)
+  if (file) {
+    const msg = existing ? `${title} : une nouvelle version est disponible.` : `${title} est disponible.`
+    for (const s of db.users.filter((u) => u.role === 'student' && u.active && classeIds.includes(u.classeId))) notify(s.id, 'Emploi du temps', msg, '/etudiant/emplois-du-temps')
+    const teachers = new Set([...teacherIds, ...db.teaching.filter((x) => classeIds.includes(x.classeId)).map((x) => x.teacherId)])
+    for (const id of teachers) notify(id, 'Emploi du temps', msg, '/enseignant/emplois-du-temps')
+  }
+  audit(actor, existing ? 'modification_emploi_du_temps' : 'depot_emploi_du_temps', title, timetableInfo(t).classes.join(', '))
+  save()
+  return clone(timetableInfo(t))
+}
+
+// Fichier plus utilisé par aucun bulletin ni emploi du temps : supprimé
+function releaseFile(key, except) {
+  if (db.bulletins.some((b) => b.fileKey === key)) return
+  if ((db.timetables || []).some((t) => t !== except && t.fileKey === key)) return
+  platform.files.remove(key)
+}
+
+export async function deleteTimetable(id) {
+  await load()
+  const actor = requireUser(...TIMETABLE_STAFF)
+  const t = (db.timetables || []).find((x) => x.id === Number(id))
+  if (!t) throw new ApiError('Emploi du temps introuvable.', 'not_found', 404)
+  db.timetables = db.timetables.filter((x) => x !== t)
+  releaseFile(t.fileKey, t)
+  audit(actor, 'suppression_emploi_du_temps', t.title)
+  save()
+}
+
+// GET /api/me/timetables : étudiant (sa classe) ; enseignant (les siens, ceux de ses classes, et la liste des
+// classes pour consulter les autres)
+export async function myTimetables() {
+  await load()
+  const user = requireUser('student', 'teacher')
+  const all = (db.timetables || []).map(timetableInfo)
+  if (user.role === 'student') {
+    const classe = db.classes.find((c) => c.id === user.classeId)
+    return clone({ classe: classe?.name ?? '', items: all.filter((t) => t.classeIds.includes(user.classeId)).sort(timetableOrder) })
+  }
+  const myClasses = new Set(db.teaching.filter((x) => x.teacherId === user.id).map((x) => x.classeId))
+  return clone({
+    items: all.filter((t) => t.teacherIds.includes(user.id) || t.classeIds.some((id) => myClasses.has(id))).map((t) => ({ ...t, personal: t.teacherIds.includes(user.id) })).sort(timetableOrder),
+    myClasses: [...myClasses],
+    classes: db.classes.filter((c) => all.some((t) => t.classeIds.includes(c.id))).map((c) => ({ id: c.id, name: c.name, level: c.level })).sort((a, b) => a.name.localeCompare(b.name, 'fr', { numeric: true })),
+    byClass: all.filter((t) => t.classeIds.length).sort(timetableOrder),
+  })
+}
+
+// Contenu du PDF : équipe pédagogique, enseignants, ou étudiant d'une classe concernée
+export async function getTimetableFile(id) {
+  await load()
+  const user = requireUser(...TIMETABLE_STAFF, 'teacher', 'student')
+  const t = (db.timetables || []).find((x) => x.id === Number(id))
+  if (!t || (user.role === 'student' && !(t.classeIds || []).includes(user.classeId))) throw new ApiError('Emploi du temps introuvable.', 'not_found', 404)
+  const bytes = await platform.files.get(t.fileKey)
+  if (!bytes) throw new ApiError('Le fichier de cet emploi du temps est introuvable. Demandez à la direction pédagogique de le déposer à nouveau.', 'not_found', 404)
+  let bin = ''
+  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000))
+  return { fileName: t.fileName, mime: 'application/pdf', base64: btoa(bin) }
 }
 
 // ---------------------------------------------------------------------------

@@ -167,7 +167,7 @@ const READ_FIRST = new Set([
   'listComments', 'assessmentResults', 'teacherClasses', 'listSessions', 'sessionDetail', 'listAlerts',
   'listAnnouncements', 'search', 'bulletinOptions', 'listBulletins', 'getBulletinFile', 'studentBulletins',
   'listEvalCampaigns', 'evalResults', 'myEvalResults', 'studentEvaluations', 'submitEvaluation', 'evalAvailable',
-  'studentHome',
+  'studentHome', 'listTimetables', 'myTimetables', 'getTimetableFile',
 ])
 
 const chunks = (list, n = 30) => Array.from({ length: Math.ceil(list.length / n) }, (_, i) => list.slice(i * n, i * n + n))

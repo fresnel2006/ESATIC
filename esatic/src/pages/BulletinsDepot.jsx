@@ -1,6 +1,6 @@
-// Dépôt des bulletins par l'établissement (éducateurs et administration).
+// Dépôt des bulletins par l'établissement (direction pédagogique, éducateurs et administration).
 // Les bulletins sont faits hors de la plateforme ; ici on dépose le fichier de chaque étudiant
-// (PDF, JPG ou PNG), et l'étudiant le retrouve dans son espace.
+// (PDF), et l'étudiant le retrouve dans son espace.
 import { useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { FileBadge, Upload, Eye, Trash2, Files, Loader2, Download } from 'lucide-react'
@@ -142,7 +142,7 @@ function ClassBulletins({ periodeId, classeId }) {
       </div>
       <div className="row-wrap">
         <p className="small muted" style={{ flex: 1, minWidth: 260 }}>
-          PDF, JPG ou PNG, 2 Mo au maximum par bulletin. Déposer un nouveau fichier remplace l'ancien. L'étudiant est prévenu à chaque dépôt.
+          PDF uniquement, 2 Mo au maximum par bulletin. Déposer un nouveau fichier remplace l'ancien. L'étudiant est prévenu à chaque dépôt.
         </p>
         <button className="btn btn-primary" disabled={!data.rows.length} onClick={() => setBulk(true)}><Files {...ICON} /> Déposer plusieurs bulletins</button>
       </div>

@@ -7,7 +7,8 @@ import { handleApi, ensureReady } from './handler.js'
 
 const PORT = Number(process.env.PORT) || 4000
 const DIST = fileURLToPath(new URL('../../esatic/dist/', import.meta.url))
-const MAX_BODY = 4 * 1024 * 1024 // bulletin de 2 Mo maximum, encodé en base64
+// Emploi du temps de 3 Mo maximum, encodé en base64 (4 Mo) : même plafond que Vercel (4,5 Mo)
+const MAX_BODY = 4.5 * 1024 * 1024
 
 function send(res, status, body) {
   res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' })

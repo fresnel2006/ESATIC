@@ -10,7 +10,7 @@
 .sidebar-logo { display: flex; justify-content: center; padding: 4px 0 26px; }
 .logo-img { box-sizing: content-box; display: block; } /* le cadre blanc s'ajoute autour de l'image sans la réduire */
 /* Cadre blanc autour du logo, comme sur la maquette ; l'image garde ses proportions */
-.sidebar-logo .logo-img { background: #fff; border-radius: 6px; padding: 8px 10px; box-shadow: 0 2px 8px rgba(4, 32, 64, 0.18); flex-shrink: 0; }
+.sidebar-logo .logo-img { background: #fff; border-radius: 0; padding: 8px 10px; box-shadow: 0 2px 8px rgba(4, 32, 64, 0.18); flex-shrink: 0; }
 .sidebar-logo .logo-mark { display: none; padding: 5px; }
 .sidebar-nav { display: flex; flex-direction: column; gap: 4px; flex: 1; overflow-y: auto; }
 .nav-item {
@@ -404,9 +404,9 @@ a.list-row:hover { background: var(--surface-2); text-decoration: none; }
 }
 .auth-photo .caption strong { display: block; font-size: 1.15rem; font-weight: 600; }
 .auth-photo .caption span { font-size: 0.88rem; opacity: 0.85; }
-.auth-photo .logo-box .logo-img { background: #fff; padding: 8px 12px; border-radius: 8px; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18); }
+.auth-photo .logo-box .logo-img { background: #fff; padding: 8px 12px; border-radius: 0; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18); }
 /* Thème sombre : le logo garde son fond blanc pour rester lisible */
-:root[data-theme='dark'] .logo-img { background: #fff; border-radius: 6px; padding: 4px 6px; }
+:root[data-theme='dark'] .logo-img { background: #fff; border-radius: 0; padding: 4px 6px; }
 @media (max-width: 860px) { .auth-photo .caption { padding: 40px 18px 14px; } .auth-photo .caption strong { font-size: 1rem; } }
 
 /* Composition : le message calme ne cache plus la question */
@@ -470,7 +470,7 @@ h2, h3 { font-weight: 600; }
   padding: 2px 0 24px; margin: 0 4px 20px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.16);
 }
-.sidebar-logo .logo-img { padding: 9px 12px; border-radius: 8px; }
+.sidebar-logo .logo-img { padding: 9px 12px; border-radius: 0; }
 .nav-section {
   padding: 0 12px 8px; font-size: 0.68rem; font-weight: 600; letter-spacing: 0.12em;
   text-transform: uppercase; color: rgba(255, 255, 255, 0.55);
@@ -998,3 +998,49 @@ h2, h3 { font-weight: 600; }
 .eval-class:hover { border-color: var(--primary); }
 .eval-class.active { border-color: var(--primary); box-shadow: 0 0 0 2px var(--primary) inset; }
 .eval-class .eval-rate { margin-top: 4px; }
+
+/* Emplois du temps (PDF) */
+.tt-layout { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 16px; align-items: start; }
+.tt-layout.single { grid-template-columns: minmax(0, 1fr); }
+.tt-side { display: flex; flex-direction: column; gap: 8px; position: sticky; top: 84px; }
+.tt-list { display: flex; flex-direction: column; gap: 6px; }
+.tt-item { display: flex; gap: 10px; align-items: flex-start; text-align: left; font: inherit; padding: 10px 12px; border: 1px solid var(--border); border-left: 3px solid transparent; background: var(--surface, #fff); cursor: pointer; transition: border-color .15s, background .15s; }
+.tt-item:hover { border-color: var(--primary); }
+.tt-item.active { border-color: var(--primary); border-left-color: var(--primary); background: var(--bg-soft, rgba(0, 80, 160, 0.05)); }
+.tt-item-icon { color: var(--primary); margin-top: 2px; flex-shrink: 0; }
+.tt-item-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.tt-item-title { font-weight: 600; }
+.tt-badge { display: inline-block; font-size: 0.72rem; font-weight: 600; padding: 1px 7px; margin-left: 4px; vertical-align: 1px; }
+.tt-badge.current { background: #e3f4ea; color: #146c3a; }
+.tt-badge.next { background: #e6effa; color: #0b4f9c; }
+.tt-badge.past { background: #eef0f3; color: #5b6573; }
+.tt-viewer { overflow: hidden; }
+.tt-viewer-head { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; padding: 14px 18px; border-bottom: 1px solid var(--border); }
+.tt-viewer-title { display: flex; gap: 12px; align-items: center; min-width: 0; }
+.tt-icon { width: 40px; height: 40px; display: grid; place-items: center; background: var(--primary); color: #fff; flex-shrink: 0; }
+.tt-note { padding: 10px 18px; background: #fff8e6; color: #7a5300; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
+.tt-frame { position: relative; height: calc(100vh - 230px); min-height: 520px; background: #525659; }
+.tt-frame iframe { width: 100%; height: 100%; border: 0; display: block; }
+.tt-frame-msg { position: absolute; inset: 0; display: flex; gap: 10px; align-items: center; justify-content: center; color: #e8eaed; }
+.tt-frame-msg.danger { color: #ffb4ab; padding: 20px; text-align: center; }
+.tt-mobile { display: none; }
+.tt-viewer-foot { padding: 10px 18px; border-top: 1px solid var(--border); }
+.tt-drop { display: flex; gap: 14px; align-items: center; padding: 22px; border: 2px dashed var(--border); color: var(--primary); cursor: pointer; transition: border-color .15s, background .15s; }
+.tt-drop:hover, .tt-drop.drag { border-color: var(--primary); background: var(--bg-soft, rgba(0, 80, 160, 0.05)); }
+.tt-drop.has-file { border-style: solid; border-color: var(--primary); }
+.tt-drop span { color: var(--text); }
+.tt-teachers { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+.tt-teachers-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 4px 12px; max-height: 200px; overflow: auto; padding: 8px; border: 1px solid var(--border); }
+.tt-missing { display: flex; gap: 8px; align-items: flex-start; padding: 10px 14px; background: #fff8e6; color: #7a5300; border-left: 3px solid #e0a100; font-size: 0.9rem; }
+.tt-filters { gap: 10px; flex-wrap: wrap; }
+.search-inline { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 220px; color: var(--text-2, inherit); }
+.search-inline .input { flex: 1; }
+@media (max-width: 900px) {
+  .tt-layout { grid-template-columns: minmax(0, 1fr); }
+  .tt-side { position: static; }
+}
+@media (max-width: 700px) {
+  .tt-frame { height: auto; min-height: 0; background: var(--bg-soft, #f3f5f8); }
+  .tt-frame iframe, .tt-frame-msg { display: none; }
+  .tt-mobile { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 28px 16px; text-align: center; color: var(--text-2, inherit); }
+}

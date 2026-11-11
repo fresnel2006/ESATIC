@@ -41,6 +41,8 @@ import BulletinsDepot from './pages/BulletinsDepot.jsx'
 import PedagogyEvaluations from './pages/PedagogyEvaluations.jsx'
 import StudentEvaluations from './pages/student/StudentEvaluations.jsx'
 import TeacherEvaluations from './pages/teacher/TeacherEvaluations.jsx'
+import TimetablesManage from './pages/TimetablesManage.jsx'
+import MyTimetables from './pages/MyTimetables.jsx'
 import AdminJournal from './pages/admin/AdminJournal.jsx'
 import AdminParametres from './pages/admin/AdminParametres.jsx'
 
@@ -88,6 +90,7 @@ export default function App() {
         <Route path="/etudiant/resultats" element={<RequireAuth roles={['student']}><StudentResultats /></RequireAuth>} />
         <Route path="/etudiant/resultats/:attemptId" element={<RequireAuth roles={['student']}><StudentResultDetail /></RequireAuth>} />
         <Route path="/etudiant/annonces" element={<RequireAuth roles={['student']}><StudentAnnonces /></RequireAuth>} />
+        <Route path="/etudiant/emplois-du-temps" element={<RequireAuth roles={['student']}><MyTimetables /></RequireAuth>} />
         <Route path="/etudiant/evaluations" element={<RequireAuth roles={['student']}><StudentEvaluations /></RequireAuth>} />
         <Route path="/etudiant/epreuve/:id" element={<RequireAuth roles={['student']}><AssessmentDetail /></RequireAuth>} />
 
@@ -101,6 +104,7 @@ export default function App() {
         <Route path="/enseignant/corrections/epreuve/:id" element={<RequireAuth roles={['teacher']}><CorrectionByQuestion /></RequireAuth>} />
         <Route path="/enseignant/resultats" element={<RequireAuth roles={['teacher']}><TeacherResultats /></RequireAuth>} />
         <Route path="/enseignant/classes" element={<RequireAuth roles={['teacher']}><TeacherClasses /></RequireAuth>} />
+        <Route path="/enseignant/emplois-du-temps" element={<RequireAuth roles={['teacher']}><MyTimetables /></RequireAuth>} />
         <Route path="/enseignant/evaluations" element={<RequireAuth roles={['teacher']}><TeacherEvaluations /></RequireAuth>} />
 
         <Route path="/surveillant/sessions" element={<RequireAuth roles={['proctor']}><ProctorSessions /></RequireAuth>} />
@@ -113,11 +117,14 @@ export default function App() {
         <Route path="/admin/structure" element={<RequireAuth roles={['admin']}><AdminStructure /></RequireAuth>} />
         <Route path="/admin/epreuves" element={<RequireAuth roles={['admin']}><AdminEpreuves /></RequireAuth>} />
         <Route path="/admin/bulletins" element={<RequireAuth roles={['admin']}><BulletinsDepot /></RequireAuth>} />
+        <Route path="/admin/emplois-du-temps" element={<RequireAuth roles={['admin']}><TimetablesManage /></RequireAuth>} />
         <Route path="/admin/journal" element={<RequireAuth roles={['admin']}><AdminJournal /></RequireAuth>} />
         <Route path="/admin/parametres" element={<RequireAuth roles={['admin']}><AdminParametres /></RequireAuth>} />
 
         <Route path="/educateur/bulletins" element={<RequireAuth roles={['educator']}><BulletinsDepot /></RequireAuth>} />
         <Route path="/direction/evaluations" element={<RequireAuth roles={['pedagogy']}><PedagogyEvaluations /></RequireAuth>} />
+        <Route path="/direction/emplois-du-temps" element={<RequireAuth roles={['pedagogy']}><TimetablesManage /></RequireAuth>} />
+        <Route path="/direction/bulletins" element={<RequireAuth roles={['pedagogy']}><BulletinsDepot /></RequireAuth>} />
 
         <Route path="*" element={<NotFound />} />
       </Route>

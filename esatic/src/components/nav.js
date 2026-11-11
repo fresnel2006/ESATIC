@@ -1,7 +1,7 @@
 import {
   House, Files, CalendarClock, FileBadge, Megaphone,
   FolderKanban, Library, ClipboardCheck, ChartColumn, Users,
-  MonitorPlay, BellRing, History, Star, Award,
+  MonitorPlay, BellRing, History, Star, Award, CalendarDays,
   LayoutDashboard, Network, FileStack, ScrollText, Settings, UserCog,
 } from 'lucide-react'
 
@@ -12,6 +12,7 @@ export const NAV = {
     { to: '/etudiant', label: 'Accueil', icon: House, end: true, mobile: true },
     { to: '/etudiant/devoirs', label: 'Devoirs', icon: Files, mobile: true },
     { to: '/etudiant/examens', label: 'Examens', icon: CalendarClock, mobile: true },
+    { to: '/etudiant/emplois-du-temps', label: 'Emploi du temps', icon: CalendarDays, mobile: true },
     { to: '/etudiant/resultats', label: 'Bulletins', icon: FileBadge, mobile: true },
     { to: '/etudiant/annonces', label: 'Annonces', icon: Megaphone, mobile: true },
     // Visible en permanence, cliquable seulement quand la direction pédagogique a validé une évaluation
@@ -25,6 +26,7 @@ export const NAV = {
     { to: '/enseignant/corrections', label: 'Corrections', icon: ClipboardCheck, mobile: true },
     { to: '/enseignant/resultats', label: 'Résultats', icon: ChartColumn, mobile: true },
     { to: '/enseignant/classes', label: 'Classes', icon: Users },
+    { to: '/enseignant/emplois-du-temps', label: 'Emplois du temps', icon: CalendarDays },
     { to: '/enseignant/evaluations', label: 'Mes évaluations', icon: Award },
   ],
   proctor: [
@@ -34,6 +36,8 @@ export const NAV = {
   ],
   pedagogy: [
     { to: '/direction/evaluations', label: 'Évaluation des enseignants', icon: Star, mobile: true },
+    { to: '/direction/emplois-du-temps', label: 'Emplois du temps', icon: CalendarDays, mobile: true },
+    { to: '/direction/bulletins', label: 'Bulletins', icon: FileBadge, mobile: true },
   ],
   educator: [
     { to: '/educateur/bulletins', label: 'Bulletins', icon: FileBadge, mobile: true },
@@ -44,6 +48,7 @@ export const NAV = {
     { to: '/admin/structure', label: 'Structure', icon: Network, mobile: true },
     { to: '/admin/epreuves', label: 'Épreuves', icon: FileStack, mobile: true },
     { to: '/admin/bulletins', label: 'Bulletins', icon: FileBadge },
+    { to: '/admin/emplois-du-temps', label: 'Emplois du temps', icon: CalendarDays },
     { to: '/admin/journal', label: "Journal d'activité", icon: ScrollText },
     { to: '/admin/parametres', label: 'Paramètres', icon: Settings },
   ],
