@@ -34,7 +34,7 @@ export default function TeacherResultats() {
         </select>
       </div>
       <ErrorBox error={list.error || res.error} />
-      {(list.loading || res.loading) && !r ? <Loader /> : !r ? <div className="card"><Empty icon={ChartColumn} title="Aucune épreuve publiée" /></div> : (
+      {(list.loading || res.loading) && !r ? <Loader variant="dashboard" /> : !r ? <div className="card"><Empty icon={ChartColumn} title="Aucune épreuve publiée" /></div> : (
         <div className="stack">
           <div className="grid-cards">
             <div className="card stat"><div className="v">{r.stats ? fmtNote(r.stats.average) : '-'}</div><div className="k">Moyenne /20</div></div>

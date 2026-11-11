@@ -30,7 +30,7 @@ export default function StudentDevoirs() {
         ]}
       />
       <ErrorBox error={error} />
-      {loading && !data ? <Loader /> : (
+      {loading && !data ? <Loader variant="rows" /> : (
         <div className="stack-sm" style={{ gap: 12 }}>
           {list.length === 0 ? <div className="card"><Empty icon={Files} title={emptyText[tab]} /></div> : list.map((a) => <TaskCard key={a.id} a={a} />)}
         </div>

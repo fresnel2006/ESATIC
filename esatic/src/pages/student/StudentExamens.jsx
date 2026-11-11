@@ -32,7 +32,7 @@ export default function StudentExamens() {
         ]}
       />
       <ErrorBox error={error} />
-      {loading && !data ? <Loader /> : (
+      {loading && !data ? <Loader variant="rows" /> : (
         <div className="stack-sm" style={{ gap: 12 }}>
           {list.length === 0 ? <div className="card"><Empty icon={CalendarClock} title="Aucun examen dans cette liste" /></div> : list.map((a) => <TaskCard key={a.id} a={a} />)}
         </div>

@@ -25,7 +25,7 @@ export default function TeacherClasses() {
         <button className="btn btn-secondary" onClick={() => setAnnonce({ title: '', body: '', classeId: current.id })}><Megaphone {...ICON} /> Annonce à la classe</button>
       )} />
       <ErrorBox error={error} />
-      {loading && !data ? <Loader /> : classes.length === 0 ? <div className="card"><Empty icon={Users} title="Aucune classe">L'administration crée les classes dans Structure.</Empty></div> : (
+      {loading && !data ? <Loader variant="cards" /> : classes.length === 0 ? <div className="card"><Empty icon={Users} title="Aucune classe">L'administration crée les classes dans Structure.</Empty></div> : (
         <div className="stack">
           <div className="pills">
             {filters.map((f) => (

@@ -30,13 +30,175 @@ export function RiskBadge({ value }) {
   return <span className={`badge badge-${tone} badge-plain`} title="Score de risque calculé à partir des événements">{value}</span>
 }
 
-// Chargement : squelette animé (le libellé reste lisible par les lecteurs d'écran)
-export function Loader({ label = 'Chargement...', lines = 4 }) {
+// ---------------------------------------------------------------------------
+// Chargement : squelettes qui reprennent la forme de la page (tableau, cartes, tableau de bord, fiche, PDF).
+// Les informations prennent ensuite exactement leur place, sans saut. Le libellé reste lisible par les
+// lecteurs d'écran.
+// ---------------------------------------------------------------------------
+const Sk = ({ w, h, className = '', style }) => <span className={`sk ${className}`} style={{ width: w, height: h, ...style }} />
+const range = (n) => Array.from({ length: n }, (_, i) => i)
+// Largeurs variées mais stables (pas de hasard : rien ne bouge d'un rendu à l'autre)
+const W = ['72%', '54%', '86%', '63%', '45%', '78%', '58%', '68%']
+
+function SkStats({ n = 4 }) {
   return (
-    <div className="skeleton" role="status" aria-label={label}>
+    <div className="grid-cards">
+      {range(n).map((i) => (
+        <div key={i} className="card stat sk-card">
+          <Sk className="sk-icon" />
+          <div className="sk-col"><Sk w="46%" h={22} /><Sk w={`${60 + (i % 3) * 10}%`} h={11} /></div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function SkTable({ rows = 7, cols = 4, toolbar = true }) {
+  return (
+    <div className="card sk-card">
+      {toolbar && <div className="sk-toolbar"><Sk w="38%" h={36} /><span className="spacer" /><Sk w={150} h={36} /></div>}
+      <div className="sk-thead">{range(cols).map((c) => <Sk key={c} w={c === 0 ? '30%' : `${12 + c * 3}%`} h={10} />)}</div>
+      {range(rows).map((r) => (
+        <div key={r} className="sk-row">
+          <div className="sk-cell" style={{ width: '30%' }}><Sk w={W[r % 8]} h={13} /><Sk w="40%" h={10} /></div>
+          {range(cols - 1).map((c) => <div key={c} className="sk-cell" style={{ width: `${12 + (c + 1) * 3}%` }}><Sk w={c === cols - 2 ? 64 : W[(r + c + 3) % 8]} h={c === cols - 2 ? 26 : 12} /></div>)}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function SkCards({ n = 6 }) {
+  return (
+    <div className="sk-cards">
+      {range(n).map((i) => (
+        <div key={i} className="card sk-card sk-tile">
+          <div className="sk-tile-head"><Sk className="sk-avatar" /><div className="sk-col"><Sk w={W[i % 8]} h={14} /><Sk w="45%" h={10} /></div></div>
+          <Sk w="92%" h={10} /><Sk w={W[(i + 2) % 8]} h={10} />
+          <div className="sk-tile-foot"><Sk w={84} h={22} /><Sk w={96} h={32} /></div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function SkBlock({ lines = 5, title = true }) {
+  return (
+    <div className="card sk-card sk-pad">
+      {title && <Sk w="34%" h={18} style={{ marginBottom: 6 }} />}
+      {range(lines).map((i) => <Sk key={i} w={W[i % 8]} h={11} />)}
+    </div>
+  )
+}
+
+// Lignes larges (devoirs, examens) : icône, titre et informations, badge, bouton
+function SkRows({ n = 4 }) {
+  return (
+    <div className="sk-rows">
+      {range(n).map((i) => (
+        <div key={i} className="card sk-card sk-rowcard">
+          <Sk className="sk-icon" />
+          <div className="sk-col"><Sk w={W[i % 8]} h={15} style={{ maxWidth: 420 }} /><Sk w="28%" h={11} /><Sk w="20%" h={10} /></div>
+          <Sk w={70} h={22} /><Sk w={120} h={32} />
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// Petite carte de liste (titre + lignes), comme les blocs de l'accueil
+function SkListCard({ rows = 3 }) {
+  return (
+    <div className="card sk-card">
+      <div className="sk-toolbar"><Sk w="38%" h={15} /><span className="spacer" /><Sk w={60} h={11} /></div>
+      {range(rows).map((i) => (
+        <div key={i} className="sk-row"><div className="sk-col"><Sk w={W[(i + 1) % 8]} h={13} /><Sk w="46%" h={10} /></div><Sk w={56} h={20} /></div>
+      ))}
+    </div>
+  )
+}
+
+const VARIANTS = {
+  table: () => <SkTable />,
+  cards: () => <SkCards />,
+  list: () => <SkTable rows={7} cols={4} toolbar={false} />,
+  rows: () => <SkRows />,
+  // Accueil étudiant : bandeau « à faire maintenant », code d'examen, devoirs ; à droite résultats et annonces
+  home: () => (
+    <div className="sk-home">
+      <div className="sk-col sk-gap">
+        <div className="sk-hero-band"><Sk w="22%" h={10} className="sk-light" /><Sk w="55%" h={20} className="sk-light" /><Sk w="38%" h={11} className="sk-light" /><div className="sk-tile-foot"><Sk w="35%" h={28} className="sk-light" /><Sk w={130} h={36} className="sk-light" /></div></div>
+        <div className="card sk-card sk-pad"><Sk w="20%" h={11} /><div className="sk-tile-head"><Sk h={40} style={{ flex: 1, minWidth: 0 }} /><Sk w={80} h={40} /></div></div>
+        <SkListCard rows={4} />
+      </div>
+      <div className="sk-col sk-gap"><SkListCard rows={2} /><SkListCard rows={3} /></div>
+    </div>
+  ),
+  // Évaluation des enseignants : campagnes, onglets, puis les classes par niveau
+  campaigns: () => (
+    <>
+      <div className="sk-campaigns">{range(2).map((i) => <div key={i} className="card sk-card sk-pad"><Sk w="80%" h={15} /><Sk w="60%" h={10} /><div className="sk-tile-head"><Sk w={74} h={20} /><Sk w={90} h={11} /></div></div>)}</div>
+      <Sk w="100%" h={46} />
+      <VARIANTS.classes />
+    </>
+  ),
+  classes: () => (
+    <>
+      <Sk w={240} h={44} />
+      {range(2).map((g) => (
+        <div key={g} className="sk-col sk-gap-sm">
+          <Sk w={150} h={14} />
+          <div className="sk-class-grid">{range(5).map((i) => <div key={i} className="card sk-card sk-pad sk-class"><Sk w="45%" h={14} /><Sk w="75%" h={10} /><Sk w="90%" h={6} /></div>)}</div>
+        </div>
+      ))}
+    </>
+  ),
+  dashboard: () => (
+    <>
+      <SkStats />
+      <div className="sk-two"><SkBlock lines={6} /><SkBlock lines={6} /></div>
+      <SkTable rows={4} toolbar={false} />
+    </>
+  ),
+  detail: () => (
+    <>
+      <div className="card sk-card sk-pad sk-hero"><Sk className="sk-avatar lg" /><div className="sk-col"><Sk w="40%" h={20} /><Sk w="62%" h={11} /></div><Sk w={110} h={34} /></div>
+      <SkBlock lines={4} />
+      <SkBlock lines={6} />
+    </>
+  ),
+  form: () => (
+    <div className="card sk-card sk-pad sk-form">
+      {range(6).map((i) => <div key={i} className="sk-col"><Sk w={`${18 + (i % 3) * 6}%`} h={10} /><Sk w="100%" h={38} /></div>)}
+      <Sk w={140} h={38} style={{ alignSelf: 'flex-end' }} />
+    </div>
+  ),
+  pdf: () => (
+    <div className="card sk-card">
+      <div className="sk-toolbar"><Sk className="sk-icon" /><div className="sk-col" style={{ flex: 1 }}><Sk w="30%" h={14} /><Sk w="45%" h={10} /></div><Sk w={110} h={32} /><Sk w={120} h={32} /></div>
+      <div className="sk-pdf"><div className="sk-page">{range(9).map((i) => <Sk key={i} w={i === 0 ? '50%' : W[i % 8]} h={i === 0 ? 20 : 12} />)}</div></div>
+    </div>
+  ),
+  block: ({ label }) => <div className="sk-editor"><Sk w="100%" h="100%" className="sk-fill" /><span className="sk-editor-label"><Loader2 size={16} className="spin" /> {label}</span></div>,
+}
+
+export function Loader({ label = 'Chargement...', variant = 'table' }) {
+  const Shape = VARIANTS[variant] || VARIANTS.table
+  return (
+    <div className={`skeleton skv-${variant}`} role="status" aria-live="polite" aria-label={label}>
       <span className="sr-only">{label}</span>
-      <div className="sk-line sk-title" />
-      {Array.from({ length: lines }, (_, i) => <div key={i} className="sk-line" style={{ width: `${92 - i * 11}%` }} />)}
+      <Shape label={label} />
+    </div>
+  )
+}
+
+// Écran d'ouverture (vérification de la session, ouverture d'une copie) : logo et barre de progression
+export function Splash({ label = 'Chargement...' }) {
+  return (
+    <div className="splash" role="status" aria-label={label}>
+      <img src="/img/logo-esatic.svg" alt="ESATIC" className="splash-logo" />
+      <span className="splash-bar"><span /></span>
+      <span className="splash-label">{label}</span>
     </div>
   )
 }

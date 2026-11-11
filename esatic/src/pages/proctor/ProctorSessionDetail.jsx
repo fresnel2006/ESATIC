@@ -25,7 +25,7 @@ export default function ProctorSessionDetail() {
   }, [id])
 
   if (error) return <ErrorBox error={error} />
-  if (!data) return <Loader />
+  if (!data) return <Loader variant="detail" />
   const { session: s, participants } = data
   const count = (st) => participants.filter((p) => p.status === st).length
 

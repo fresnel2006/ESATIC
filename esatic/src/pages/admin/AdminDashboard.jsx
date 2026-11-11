@@ -17,7 +17,7 @@ export default function AdminDashboard() {
         </>}
       />
       <ErrorBox error={error} />
-      {loading && !data ? <Loader /> : data && (
+      {loading && !data ? <Loader variant="dashboard" /> : data && (
         <div className="stack">
           <div className="grid-cards">
             <Stat icon={GraduationCap} value={data.students} label="Étudiants" />

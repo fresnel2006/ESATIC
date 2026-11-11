@@ -30,7 +30,7 @@ export default function AdminJournal() {
         <input type="date" className="input" value={day} onChange={(e) => setDay(e.target.value)} aria-label="Jour" />
       </div>
       <ErrorBox error={error} />
-      {loading && !data ? <Loader /> : (
+      {loading && !data ? <Loader variant="list" /> : (
         <div className="card">
           <ResponsiveTable
             rows={rows.slice(0, 300)}

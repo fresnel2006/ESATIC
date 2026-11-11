@@ -1,4 +1,4 @@
-﻿import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
   Maximize, Check, CloudUpload, CloudOff, Loader2, Play, ChevronLeft, ChevronRight, Globe, ListChecks,
@@ -13,7 +13,7 @@ import { prepareEngine } from '../../lib/engines.js'
 import { useExecution } from '../../lib/useExecution.js'
 import { EngineLine } from '../../components/EngineStatus.jsx'
 import { TEST_MODE } from '../../config.js'
-import { Loader, Modal, Notice, ErrorBox, ICON } from '../../components/ui.jsx'
+import { Loader, Modal, Notice, ErrorBox, ICON, Splash } from '../../components/ui.jsx'
 import { WebEditor, WebPreview, webValue } from '../../components/WebPlayground.jsx'
 import ExamOutline, { outlineOf } from '../../components/ExamOutline.jsx'
 import { useExamGuard } from '../../lib/useExamGuard.js'
@@ -233,7 +233,7 @@ function QuestionBody({ q, value, onChange, onBigInsert, desktop }) {
             Double-cliquez sur un lien pour écrire sa cardinalité (0,1, 1,1, 0,n, 1,n), ou sur une forme pour changer son texte. Pour changer la taille d'une forme, cliquez dessus puis tirez un des petits carrés bleus. Ctrl+Z annule. Votre diagramme est enregistré automatiquement.
           </span>
         </div>
-        <Suspense fallback={<Loader label="Ouverture de l'éditeur de diagrammes..." />}>
+        <Suspense fallback={<Loader variant="block" label="Ouverture de l'éditeur de diagrammes..." />}>
           <DiagramEditor key={q.id} value={value || q.data.starterXml || ''} onChange={onChange} height={600} />
         </Suspense>
       </div>
@@ -467,7 +467,7 @@ export default function TakeAttempt() {
   }
 
   if (error) return <div className="content"><ErrorBox error={error} /><p style={{ marginTop: 12 }}><Link to="/etudiant">Retour à l'accueil</Link></p></div>
-  if (!att) return <Loader label="Ouverture de la copie..." />
+  if (!att) return <Splash label="Ouverture de la copie..." />
 
   if (finished) {
     return (

@@ -9,7 +9,7 @@ function Results({ a, onClose }) {
   return (
     <Modal wide title={a.title} onClose={onClose}>
       <ErrorBox error={error} />
-      {loading && !data ? <Loader /> : data && (
+      {loading && !data ? <Loader variant="list" /> : data && (
         <div className="stack">
           <p className="small muted">{a.classe} - {a.teacher} - {data.assessment.resultsPublished ? 'notes publiées' : 'notes non publiées'}{data.stats ? ` - moyenne ${fmtNote(data.stats.average)}/20` : ''}</p>
           <ResponsiveTable
@@ -40,7 +40,7 @@ export default function AdminEpreuves() {
         <Pills value={tab} onChange={setTab} items={[{ value: 'tous', label: 'Toutes' }, { value: 'devoir', label: 'Devoirs' }, { value: 'examen', label: 'Examens' }, { value: 'brouillon', label: 'Brouillons' }, { value: 'annule', label: 'Annulées' }]} />
       </div>
       <ErrorBox error={error} />
-      {loading && !data ? <Loader /> : (
+      {loading && !data ? <Loader variant="list" /> : (
         <div className="card">
           <ResponsiveTable
             rows={rows}

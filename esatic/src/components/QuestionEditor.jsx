@@ -78,7 +78,7 @@ function DiagramDetails({ title, children }) {
   return (
     <details className="diagram-details" open={open} onToggle={(e) => setOpen(e.currentTarget.open)}>
       <summary>{title}</summary>
-      {open && <Suspense fallback={<Loader label="Chargement de l'éditeur..." />}>{children}</Suspense>}
+      {open && <Suspense fallback={<Loader variant="block" label="Chargement de l'éditeur..." />}>{children}</Suspense>}
     </details>
   )
 }
@@ -202,7 +202,7 @@ export default function QuestionEditor({ q, index, total, onChange, onRemove, on
             )}
             <Field label="Code de départ donné à l'étudiant">
               <div className="code-area">
-                <Suspense fallback={<Loader label="Chargement de l'éditeur..." />}>
+                <Suspense fallback={<Loader variant="block" label="Chargement de l'éditeur..." />}>
                   <CodeEditor key={q.data.language} value={q.data.starter} language={q.data.language} onChange={(v) => setData({ starter: v })} height={200} />
                 </Suspense>
               </div>
@@ -262,7 +262,7 @@ export default function QuestionEditor({ q, index, total, onChange, onRemove, on
             <div className="stack-sm">
               <span className="label">Fichiers de départ donnés à l'étudiant</span>
               <span className="hint">L'étudiant retrouve ces trois fichiers et voit le rendu de sa page en direct, à côté de son code.</span>
-              <Suspense fallback={<Loader />}>
+              <Suspense fallback={<Loader variant="block" label="Chargement de l'éditeur..." />}>
                 <WebEditor
                   value={{ html: q.data.starterHtml ?? '', css: q.data.starterCss ?? '', js: q.data.starterJs ?? '' }}
                   onChange={(v) => setData({ starterHtml: v.html, starterCss: v.css, starterJs: v.js })}

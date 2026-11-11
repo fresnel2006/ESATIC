@@ -291,10 +291,10 @@ export default function AdminUsers() {
           <option value="">Toutes les classes</option>
           {structure.classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
-        <span className="small muted" style={{ alignSelf: 'center' }}>{rows.length} compte(s)</span>
+        {data && <span className="small muted" style={{ alignSelf: 'center' }}>{rows.length} compte(s)</span>}
       </div>
       <ErrorBox error={error} />
-      {loading && !data ? <Loader /> : (
+      {loading && !data ? <Loader variant="list" /> : (
         <div className="card">
           <ResponsiveTable
             rows={rows}

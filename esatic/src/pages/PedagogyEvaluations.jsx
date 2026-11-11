@@ -189,7 +189,7 @@ function TeachersTable({ rows: list, minResponses, title, showClasses }) {
 function ClassView({ campaignId, classeId }) {
   const { data, loading, error } = useAsync(() => api.evalResults(campaignId, classeId), [campaignId, classeId])
   if (error) return <ErrorBox error={error} />
-  if (loading && !data) return <Loader />
+  if (loading && !data) return <Loader variant="dashboard" />
   const k = data.classe
   return (
     <div className="stack">
@@ -227,7 +227,7 @@ function Dashboard({ campaignId }) {
   const view = params.get('vue') === 'ecole' ? 'ecole' : 'classe'
   const setP = (p) => setParams((cur) => { const n = new URLSearchParams(cur); for (const [a, b] of Object.entries(p)) (b == null ? n.delete(a) : n.set(a, b)); return n }, { replace: true })
   if (error) return <ErrorBox error={error} />
-  if (loading && !data) return <Loader />
+  if (loading && !data) return <Loader variant="classes" />
   const d = data.dashboard
   const classes = [...d.byClass].sort((a, b) => a.classe.localeCompare(b.classe, 'fr', { numeric: true }))
   // Toutes les classes, rangées par niveau (L1 ... M2, prépas)
@@ -367,7 +367,7 @@ export default function PedagogyEvaluations() {
         <button className="btn btn-primary" onClick={() => setForm('new')}><Plus {...ICON} /> Nouvelle évaluation</button>
       } />
       <ErrorBox error={error} />
-      {loading && !data ? <Loader /> : !campaigns.length ? (
+      {loading && !data ? <Loader variant="campaigns" /> : !campaigns.length ? (
         <div className="card"><Empty icon={ClipboardCheck} title="Aucune évaluation pour le moment">Ouvrez une évaluation : les étudiants pourront évaluer les enseignants de leur classe, de façon anonyme.</Empty></div>
       ) : (
         <div className="stack">

@@ -91,7 +91,7 @@ export default function Corrections() {
       )}
 
       <ErrorBox error={error} />
-      {loading && !data ? <Loader /> : (
+      {loading && !data ? <Loader variant="list" /> : (
         <div className="card">
           <ResponsiveTable
             rows={rows}

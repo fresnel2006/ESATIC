@@ -118,7 +118,7 @@ function ClassBulletins({ periodeId, classeId }) {
   const target = useRef(null)
 
   if (error) return <ErrorBox error={error} />
-  if (loading && !data) return <Loader />
+  if (loading && !data) return <Loader variant="list" />
   const done = data.rows.filter((r) => r.bulletin).length
 
   async function upload(file) {
@@ -204,7 +204,7 @@ export default function BulletinsDepot() {
     <div>
       <PageHead title="Bulletins" subtitle="Dépôt des bulletins de l'établissement : chaque étudiant retrouve le sien dans son espace" />
       <ErrorBox error={error} />
-      {loading && !data ? <Loader /> : !periodes.length ? (
+      {loading && !data ? <Loader variant="table" /> : !periodes.length ? (
         <Notice>Aucune période n'est définie. L'administration doit d'abord créer les périodes (Structure &gt; Périodes).</Notice>
       ) : (
         <div className="stack">

@@ -44,7 +44,7 @@ function ToolsCard() {
       <div className="card-body stack">
         <Notice>Rien n'est à installer, ni sur les PC des étudiants ni sur le serveur : tout se passe dans le navigateur.</Notice>
         <ErrorBox error={error} />
-        {!data ? <Loader /> : (
+        {!data ? <Loader variant="list" /> : (
           <ResponsiveTable
             rowKey="key"
             rows={data}
@@ -74,7 +74,7 @@ export default function AdminParametres() {
 
   useEffect(() => { api.getStructure().then((s) => setSchool(s.school)).catch(setError) }, [])
   if (error) return <ErrorBox error={error} />
-  if (!school) return <Loader />
+  if (!school) return <Loader variant="form" />
   const st = school.settings
   const set = (p) => setSchool({ ...school, settings: { ...st, ...p } })
 

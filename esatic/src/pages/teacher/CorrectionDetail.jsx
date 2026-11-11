@@ -59,7 +59,7 @@ export default function CorrectionDetail() {
   }, [])
 
   if (error) return <ErrorBox error={error} />
-  if (!data || data.attempt.id !== Number(attemptId)) return <Loader />
+  if (!data || data.attempt.id !== Number(attemptId)) return <Loader variant="detail" />
 
   const { attempt: t, assessment: a, student, risk, siblings } = data
   const pos = siblings.indexOf(t.id)

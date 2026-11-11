@@ -29,7 +29,7 @@ export default function ProctorAlertes() {
         <Pills value={tab} onChange={setTab} items={[{ value: 'live', label: 'Sessions ouvertes' }, { value: 'all', label: 'Toutes' }]} />
       </div>
       <ErrorBox error={error} />
-      {!data ? <Loader /> : (
+      {!data ? <Loader variant="list" /> : (
         <div className="card">
           <ResponsiveTable
             rowKey="key"

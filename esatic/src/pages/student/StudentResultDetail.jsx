@@ -13,7 +13,7 @@ export default function StudentResultDetail() {
     <div className="stack">
       <Link to="/etudiant/resultats" className="row small"><ArrowLeft {...ICON} /> Retour aux résultats</Link>
       <ErrorBox error={error} />
-      {loading && !data ? <Loader /> : data && (
+      {loading && !data ? <Loader variant="detail" /> : data && (
         <>
           <div className="card"><div className="card-body row" style={{ flexWrap: 'wrap' }}>
             <div className="grow" style={{ flex: 1 }}>

@@ -9,7 +9,7 @@ export default function StudentAnnonces() {
     <div className="stack">
       <h1 style={{ fontSize: '1.15rem' }}>Annonces</h1>
       <ErrorBox error={error} />
-      {loading && !data ? <Loader /> : data.length === 0 ? <div className="card"><Empty icon={Megaphone} title="Aucune annonce" /></div> : (
+      {loading && !data ? <Loader variant="list" /> : data.length === 0 ? <div className="card"><Empty icon={Megaphone} title="Aucune annonce" /></div> : (
         data.map((n) => (
           <article className="card" key={n.id}>
             <div className="card-body stack-sm">

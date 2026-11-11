@@ -11,7 +11,7 @@ export default function ProctorHistorique() {
     <div>
       <PageHead title="Historique" subtitle="Sessions terminées" />
       <ErrorBox error={error} />
-      {loading && !data ? <Loader /> : (
+      {loading && !data ? <Loader variant="list" /> : (
         <div className="card">
           <ResponsiveTable
             rows={rows}

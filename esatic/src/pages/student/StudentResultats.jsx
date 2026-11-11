@@ -25,7 +25,7 @@ export default function StudentResultats() {
         items={[{ value: 'notes', label: 'Notes' }, { value: 'bulletins', label: 'Bulletins' }]}
       />
       <ErrorBox error={error} />
-      {tab === 'notes' && (loading && !data ? <Loader /> : (
+      {tab === 'notes' && (loading && !data ? <Loader variant="list" /> : (
         <>
           {Object.keys(byMatiere).length > 0 && (
             <div className="grid-cards">
@@ -67,7 +67,7 @@ function BulletinsTab() {
   const [busy, setBusy] = useState(null)
   const { data, loading, error } = useAsync(() => api.studentBulletins(), [])
   if (error) return <ErrorBox error={error} />
-  if (loading && !data) return <Loader />
+  if (loading && !data) return <Loader variant="list" />
   const run = async (key, fn) => {
     setBusy(key)
     try { await fn() } catch (e) { toast.error(e.message) } finally { setBusy(null) }

@@ -12,7 +12,7 @@ export default function TeacherEvaluations() {
     <div>
       <PageHead title="Mes évaluations" subtitle="Ce que vos étudiants pensent de vos cours, de façon anonyme" />
       <ErrorBox error={error} />
-      {loading && !data ? <Loader /> : (
+      {loading && !data ? <Loader variant="detail" /> : (
         <div className="stack">
           {data.pending.map((c) => (
             <Notice key={c.id}><Clock size={15} style={{ verticalAlign: '-2px' }} /> « {c.title} » est en cours jusqu'au {fmtDateTime(c.endAt)}. Vos résultats seront disponibles à sa clôture.</Notice>

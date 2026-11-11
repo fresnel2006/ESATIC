@@ -40,7 +40,7 @@ export default function AssessmentDetail() {
     for (const l of langs.split(',')) prepareEngine(l)
   }, [langs, a?.status])
 
-  if (loading && !a) return <Loader />
+  if (loading && !a) return <Loader variant="detail" />
   if (error) return <ErrorBox error={error} />
 
   const closed = a.status === 'annule' || new Date(a.endAt).getTime() < t

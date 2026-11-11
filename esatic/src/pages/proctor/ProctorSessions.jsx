@@ -68,7 +68,7 @@ export default function ProctorSessions() {
     <div>
       <PageHead title="Sessions d'examen" subtitle="Ouvrez la session, donnez le code aux étudiants, suivez la composition" />
       <ErrorBox error={error} />
-      {loading && !data ? <Loader /> : list.length === 0 ? <div className="card"><Empty icon={MonitorPlay} title="Aucune session prévue" /></div> : (
+      {loading && !data ? <Loader variant="cards" /> : list.length === 0 ? <div className="card"><Empty icon={MonitorPlay} title="Aucune session prévue" /></div> : (
         <div className="grid-cards" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))' }}>
           {list.map((s) => <SessionCard key={s.id} s={s} onOpen={(x) => setOpening({ ...x, room: x.room || '' })} onClose={setClosing} />)}
         </div>

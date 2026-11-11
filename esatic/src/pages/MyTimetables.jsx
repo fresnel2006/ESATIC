@@ -39,7 +39,7 @@ export default function MyTimetables() {
     <div>
       <PageHead title="Emplois du temps" subtitle={teacher ? 'Vos emplois du temps et ceux des classes' : data?.classe ? `Classe ${data.classe}` : 'Emplois du temps de votre classe'} />
       <ErrorBox error={error} />
-      {loading && !data ? <Loader /> : !teacher ? (
+      {loading && !data ? <Loader variant="pdf" /> : !teacher ? (
         <Browser items={data.items} showTargets={false} empty={none('La direction pédagogique déposera l\'emploi du temps de votre classe ici. Vous serez prévenu par une notification.')} />
       ) : (
         <div className="stack">

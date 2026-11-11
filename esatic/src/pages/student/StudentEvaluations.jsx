@@ -95,7 +95,7 @@ export default function StudentEvaluations() {
         </div>
       </div>
       <ErrorBox error={error} />
-      {loading && !data ? <Loader /> : !data.campaigns.length ? (
+      {loading && !data ? <Loader variant="cards" /> : !data.campaigns.length ? (
         <div className="card"><Empty icon={Lock} title="L'évaluation n'est pas encore ouverte">La direction pédagogique vous préviendra par une notification à l'ouverture de la prochaine évaluation.</Empty></div>
       ) : data.campaigns.map((c) => {
         const done = c.teachers.filter((t) => t.done).length

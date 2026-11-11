@@ -2,7 +2,7 @@ import { lazy, Suspense } from 'react'
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { useAuth } from './context/AuthContext.jsx'
 import AppLayout from './components/AppLayout.jsx'
-import { Loader } from './components/ui.jsx'
+import { Loader, Splash } from './components/ui.jsx'
 import ErrorBoundary from './components/ErrorBoundary.jsx'
 import { ROLE_HOME } from './lib/format.js'
 
@@ -53,7 +53,7 @@ const EpreuveWizard = lazy(() => import('./pages/teacher/EpreuveWizard.jsx'))
 function RequireAuth({ roles, children }) {
   const { user, loading } = useAuth()
   const location = useLocation()
-  if (loading) return <Loader />
+  if (loading) return <Splash />
   if (!user) return <Navigate to="/connexion" replace state={{ from: location.pathname }} />
   if (user.mustChangePassword && location.pathname !== '/premiere-connexion') {
     return <Navigate to="/premiere-connexion" replace />
@@ -64,11 +64,11 @@ function RequireAuth({ roles, children }) {
 
 function HomeRedirect() {
   const { user, loading } = useAuth()
-  if (loading) return <Loader />
+  if (loading) return <Splash />
   return <Navigate to={user ? ROLE_HOME[user.role] : '/connexion'} replace />
 }
 
-const lazyPage = (el) => <ErrorBoundary><Suspense fallback={<Loader />}>{el}</Suspense></ErrorBoundary>
+const lazyPage = (el, fallback = <Loader variant="form" />) => <ErrorBoundary><Suspense fallback={fallback}>{el}</Suspense></ErrorBoundary>
 
 export default function App() {
   return (
@@ -78,7 +78,7 @@ export default function App() {
       <Route path="/premiere-connexion" element={<RequireAuth><ChangePassword firstLogin /></RequireAuth>} />
 
       {/* Composition : plein écran, sans la navigation */}
-      <Route path="/etudiant/composer/:attemptId" element={<RequireAuth roles={['student']}>{lazyPage(<TakeAttempt />)}</RequireAuth>} />
+      <Route path="/etudiant/composer/:attemptId" element={<RequireAuth roles={['student']}>{lazyPage(<TakeAttempt />, <Splash label="Ouverture de l'épreuve..." />)}</RequireAuth>} />
 
       <Route element={<RequireAuth><AppLayout /></RequireAuth>}>
         <Route path="/compte/profil" element={<Profile />} />

@@ -126,7 +126,7 @@ export default function TimetablesManage() {
         <button className="btn btn-primary" disabled={!data} onClick={() => setForm('new')}><Plus {...ICON} /> Déposer un emploi du temps</button>
       } />
       <ErrorBox error={error} />
-      {loading && !data ? <Loader /> : (
+      {loading && !data ? <Loader variant="table" /> : (
         <div className="stack">
           {missing.length > 0 && data.items.length > 0 && (
             <div className="tt-missing"><TriangleAlert size={16} /> <span><b>{missing.length} classe{missing.length > 1 ? 's' : ''} sans emploi du temps en cours :</b> {missing.map((c) => c.name).join(', ')}</span></div>

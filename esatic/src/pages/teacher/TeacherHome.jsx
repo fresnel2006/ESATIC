@@ -25,7 +25,7 @@ export default function TeacherHome() {
         <Link to="/enseignant/epreuves/nouvelle" className="btn btn-primary"><Plus {...ICON} /> Nouvelle épreuve</Link>
       </div>
       <ErrorBox error={error} />
-      {loading && !data ? <Loader /> : (
+      {loading && !data ? <Loader variant="dashboard" /> : (
         <>
           <div className="grid-cards">
             <Stat icon={FolderKanban} value={live.length} label="Épreuves en cours" />

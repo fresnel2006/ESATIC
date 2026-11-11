@@ -40,7 +40,7 @@ export default function CorrectionByQuestion() {
   }, [id, qid])
 
   if (error) return <ErrorBox error={error} />
-  if (!data) return <Loader />
+  if (!data) return <Loader variant="detail" />
   const { assessment: a, question: q, copies } = data
   const idx = a.questions.findIndex((x) => x.id === q.id)
   const goto = (i) => setParams({ question: a.questions[i].id })

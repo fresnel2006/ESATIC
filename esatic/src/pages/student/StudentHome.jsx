@@ -64,7 +64,7 @@ export default function StudentHome() {
         <p>{fmtLongDay()}{data?.classe ? ` - ${data.classe}` : ''}</p>
       </div>
       <ErrorBox error={error} />
-      {loading && !data ? <Loader /> : data && (
+      {loading && !data ? <Loader variant="home" /> : data && (
         <div className="home-grid">
           <div className="home-col">
             <NowCard a={data.next} />

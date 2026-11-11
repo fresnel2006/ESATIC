@@ -109,7 +109,7 @@ export default function AdminStructure() {
       } />
       <div style={{ marginBottom: 16 }}><Tabs items={TABS} value={tab} onChange={(v) => setParams({ onglet: v })} /></div>
       <ErrorBox error={error} />
-      {loading && !data ? <Loader /> : (
+      {loading && !data ? <Loader variant="list" /> : (
         <div className="card">
           {tab === 'classes' && (
             <div className="card-header">

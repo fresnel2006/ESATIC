@@ -51,7 +51,7 @@ export default function QuestionBank() {
         </select>
       </div>
       <ErrorBox error={error} />
-      {loading && !data ? <Loader /> : (
+      {loading && !data ? <Loader variant="list" /> : (
         <div className="card">
           <ResponsiveTable
             rows={rows}

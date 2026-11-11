@@ -69,7 +69,7 @@ function BankPicker({ matiereId, allowed, onPick, onClose }) {
           <button className={`pill ${filter === 'mine' ? 'active' : ''}`} onClick={() => setFilter('mine')}>Cette matière</button>
           <button className={`pill ${filter === 'all' ? 'active' : ''}`} onClick={() => setFilter('all')}>Toutes</button>
         </div>
-        {!items ? <Loader /> : list.length === 0 ? <Empty icon={Library} title="Aucune question dans la banque" /> : (
+        {!items ? <Loader variant="list" /> : list.length === 0 ? <Empty icon={Library} title="Aucune question dans la banque" /> : (
           <div className="stack-sm">
             {list.map((b) => (
               <label key={b.id} className={`choice ${selected.includes(b.id) ? 'selected' : ''}`} style={allowed(b) ? undefined : { opacity: 0.55, cursor: 'not-allowed' }}>
@@ -109,7 +109,7 @@ export default function EpreuveWizard() {
   }, [id])
 
   if (loadError) return <ErrorBox error={loadError} />
-  if (!a || !teaching) return <Loader />
+  if (!a || !teaching) return <Loader variant="form" />
 
   const set = (patch) => setA((x) => ({ ...x, ...patch }))
   const setSec = (patch) => setA((x) => ({ ...x, security: { ...x.security, ...patch } }))

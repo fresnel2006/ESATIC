@@ -32,7 +32,7 @@ export default function TeacherEpreuves() {
         ]} />
       </div>
       <ErrorBox error={error} />
-      {loading && !data ? <Loader /> : (
+      {loading && !data ? <Loader variant="list" /> : (
         <div className="card">
           <ResponsiveTable
             rows={list}
