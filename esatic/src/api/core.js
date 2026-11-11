@@ -40,8 +40,21 @@ const platform = {
     },
     remove: (key) => { demoFiles.delete(key); localStorage.removeItem(`esatic-demo-file-${key}`) },
   },
+  // Petites collections à part (évaluation des enseignants) : dans le navigateur en mode démo
+  store: {
+    createAll: async (items) => {
+      const all = demoStore()
+      if (items.some((it) => all[it.collection]?.[it.id])) return false
+      for (const it of items) (all[it.collection] ||= {})[it.id] = it.data
+      localStorage.setItem('esatic-demo-store', JSON.stringify(all))
+      return true
+    },
+    query: async (collection, filters) => Object.values(demoStore()[collection] || {}).filter((d) => Object.entries(filters).every(([f, v]) => d[f] === v)),
+    count: async (collection, filters) => Object.values(demoStore()[collection] || {}).filter((d) => Object.entries(filters).every(([f, v]) => d[f] === v)).length,
+  },
 }
 const demoFiles = new Map()
+const demoStore = () => { try { return JSON.parse(localStorage.getItem('esatic-demo-store')) || {} } catch { return {} } }
 
 // Le serveur remplace le stockage, le jeton et le hachage
 export function configurePlatform(overrides) {
@@ -81,6 +94,7 @@ async function load() {
     demoDb = stored
     migrate()
     await addDemoEducator()
+    await addDemoPedagogy()
     return demoDb
   }
   demoDb = await buildSeed(platform.hash)
@@ -95,6 +109,7 @@ export async function buildInitialData() {
 export async function migrateData() {
   migrate()
   await addDemoEducator()
+  await addDemoPedagogy()
 }
 
 // Base de démonstration créée avant le rôle Éducateur : ajout du compte EDU001 (dépôt des bulletins)
@@ -104,6 +119,18 @@ async function addDemoEducator() {
   db.users.push({
     id: nextId('user'), schoolId: db.school.id ?? 1, role: 'educator', matricule: 'EDU001', firstName: 'Adjoua', lastName: 'Brou',
     email: 'adjoua.brou@esatic.ci', passwordHash: await platform.hash('Educ2026!'), mustChangePassword: false, active: true,
+    classeId: null, createdAt: now(), lastLoginAt: null, activeToken: null,
+  })
+  save()
+}
+
+// Base de démonstration créée avant le rôle Direction pédagogique : ajout du compte DIR001 (évaluation des enseignants)
+async function addDemoPedagogy() {
+  const isDemo = db.school?.demo ?? db.users.some((u) => u.matricule === 'ETU24001')
+  if (!isDemo || db.users.some((u) => u.matricule === 'DIR001')) return
+  db.users.push({
+    id: nextId('user'), schoolId: db.school.id ?? 1, role: 'pedagogy', matricule: 'DIR001', firstName: 'Koffi', lastName: 'Assemien',
+    email: 'koffi.assemien@esatic.ci', passwordHash: await platform.hash('Direction2026!'), mustChangePassword: false, active: true,
     classeId: null, createdAt: now(), lastLoginAt: null, activeToken: null,
   })
   save()
@@ -220,6 +247,9 @@ function migrate() {
   if (!Array.isArray(db.bulletins)) { db.bulletins = []; changed = true }
   if (db.bulletins.some((b) => !b.fileKey)) { db.bulletins = db.bulletins.filter((b) => b.fileKey); changed = true }
   db.seq.bulletin ??= 100
+  // Évaluation des enseignants (ajoutée après coup) : campagnes
+  if (!Array.isArray(db.evalCampaigns)) { db.evalCampaigns = []; changed = true }
+  if (db.seq.evalCampaign === undefined) { db.seq.evalCampaign = 0; changed = true }
   if (changed) save()
 }
 
@@ -2204,6 +2234,325 @@ export async function studentBulletins() {
       fileName: b.fileName, mime: b.mime, size: b.size, version: b.version, uploadedAt: b.uploadedAt,
     }))
     .sort((x, y) => (y.uploadedAt > x.uploadedAt ? 1 : -1))
+}
+
+// ---------------------------------------------------------------------------
+// Évaluation des enseignants par les étudiants
+// La direction pédagogique rédige les questions de la campagne (période, dates), qui reste en brouillon tant qu'elle
+// ne l'a pas validée : avant, la section est visible chez les étudiants mais pas cliquable. Chaque étudiant évalue
+// ensuite les enseignants affectés à sa classe, une fois par enseignant et par matière : chaque question notée de
+// 1 à 5 et un commentaire facultatif.
+// Anonymat : la réponse est rangée sans l'étudiant ; un registre à part (participation) empêche seulement de
+// répondre deux fois. Les moyennes et commentaires ne s'affichent qu'à partir de EVAL_MIN_RESPONSES réponses.
+// Seule la direction pédagogique voit le tableau de bord de tous les enseignants ; chaque enseignant voit les
+// siens après la clôture.
+// ---------------------------------------------------------------------------
+
+export const EVAL_CRITERIA = [
+  { key: 'clarte', label: 'Clarté des explications' },
+  { key: 'maitrise', label: 'Maîtrise de la matière' },
+  { key: 'organisation', label: 'Organisation et préparation des cours' },
+  { key: 'disponibilite', label: 'Disponibilité et écoute' },
+  { key: 'ponctualite', label: 'Ponctualité et assiduité' },
+  { key: 'equite', label: 'Équité des évaluations' },
+]
+export const EVAL_MIN_RESPONSES = 3
+const EVAL_COMMENT_MAX = 1000
+const EVAL_QUESTIONS_MAX = 30
+const EVAL_QUESTION_LEN = 200
+const EVAL_OPTIONS_MAX = 8
+const EVAL_ANSWER_MAX = 1000
+// Types d'éléments d'une évaluation : titre de partie, note en étoiles (1 à 5), QCM (un choix), question ouverte
+const EVAL_TYPES = ['partie', 'note', 'qcm', 'texte']
+
+const evalOpen = (c) => c.status === 'ouverte' && Date.now() >= new Date(c.startAt).getTime() && Date.now() <= new Date(c.endAt).getTime()
+const evalType = (q) => q.type || 'note'
+// Éléments de la campagne (rédigés par la direction pédagogique) ; anciennes campagnes : les 6 critères d'origine
+const evalQuestions = (c) => (Array.isArray(c.questions) && c.questions.length ? c.questions : EVAL_CRITERIA).map((q) => ({ ...q, type: evalType(q) }))
+function cleanEvalQuestions(list) {
+  if (!Array.isArray(list)) throw new ApiError('Rédigez au moins une question.')
+  const out = []
+  let n = 0
+  let p = 0
+  for (const raw of list) {
+    const type = EVAL_TYPES.includes(raw?.type) ? raw.type : 'note'
+    const label = String(raw?.label ?? '').trim()
+    if (!label) {
+      if (type === 'qcm' && (raw.options || []).some((o) => String(o).trim())) throw new ApiError('Un QCM n\'a pas d\'énoncé.')
+      continue // ligne vide : ignorée
+    }
+    if (label.length > EVAL_QUESTION_LEN) throw new ApiError(`« ${label.slice(0, 40)}... » : ${EVAL_QUESTION_LEN} caractères au maximum.`)
+    if (type === 'partie') { out.push({ key: `p${++p}`, type, label }); continue }
+    const q = { key: `q${++n}`, type, label }
+    if (type === 'qcm') {
+      const options = (raw.options || []).map((o) => String(o).trim().slice(0, 120)).filter(Boolean)
+      if (options.length < 2) throw new ApiError(`QCM « ${label.slice(0, 50)} » : proposez au moins 2 réponses.`)
+      if (options.length > EVAL_OPTIONS_MAX) throw new ApiError(`QCM « ${label.slice(0, 50)} » : ${EVAL_OPTIONS_MAX} réponses au maximum.`)
+      if (new Set(options.map((o) => o.toLowerCase())).size !== options.length) throw new ApiError(`QCM « ${label.slice(0, 50)} » : deux réponses sont identiques.`)
+      q.options = options
+    }
+    out.push(q)
+  }
+  if (!n) throw new ApiError('Rédigez au moins une question.')
+  if (n > EVAL_QUESTIONS_MAX) throw new ApiError(`${EVAL_QUESTIONS_MAX} questions au maximum.`)
+  // Un titre de partie en fin de liste, sans question : retiré
+  while (out.length && out[out.length - 1].type === 'partie') out.pop()
+  return out
+}
+// Résultats question par question (dans l'ordre de la campagne). Les réponses ouvertes sont mélangées,
+// indépendamment des commentaires : rien ne permet de relier deux réponses d'un même étudiant.
+function evalItems(list, questions) {
+  const avg = (xs) => (xs.length ? Math.round((xs.reduce((s, x) => s + x, 0) / xs.length) * 100) / 100 : null)
+  const shuffle = (xs) => xs.map((x) => [Math.random(), x]).sort((a, b) => a[0] - b[0]).map((x) => x[1])
+  return questions.map((q) => {
+    if (q.type === 'note') return { ...q, average: avg(list.map((r) => Number(r.scores?.[q.key])).filter((x) => x >= 1 && x <= 5)) }
+    if (q.type === 'qcm') {
+      const counts = q.options.map((_, i) => list.filter((r) => r.answers?.[q.key] === i).length)
+      return { ...q, total: counts.reduce((s, x) => s + x, 0), options: q.options.map((label, i) => ({ label, count: counts[i] })) }
+    }
+    if (q.type === 'texte') return { ...q, answers: shuffle(list.map((r) => String(r.answers?.[q.key] ?? '').trim()).filter(Boolean)) }
+    return { ...q }
+  })
+}
+const evalCampaignOf = (id) => {
+  const c = (db.evalCampaigns || []).find((x) => x.id === Number(id))
+  if (!c) throw new ApiError('Campagne d\'évaluation introuvable.', 'not_found', 404)
+  return c
+}
+// Enseignants (et matières) d'une classe, d'après les affectations de l'administration
+const classTeaching = (classeId) => db.teaching
+  .filter((t) => t.classeId === classeId)
+  .filter((t) => db.users.some((u) => u.id === t.teacherId && u.role === 'teacher' && u.active))
+const fullName = (id) => { const u = db.users.find((x) => x.id === id); return u ? `${u.lastName} ${u.firstName}` : '' }
+const matiereName = (id) => db.matieres.find((m) => m.id === id)?.name ?? ''
+
+// Moyennes par enseignant et matière, à partir des réponses (anonymes)
+function evalAggregate(responses, questions) {
+  const groups = new Map()
+  for (const r of responses) {
+    const k = `${r.teacherId}|${r.matiereId}`
+    if (!groups.has(k)) groups.set(k, { teacherId: r.teacherId, matiereId: r.matiereId, classes: new Set(), list: [] })
+    const g = groups.get(k)
+    g.classes.add(r.classeId)
+    g.list.push(r)
+  }
+  const avg = (xs) => (xs.length ? Math.round((xs.reduce((s, x) => s + x, 0) / xs.length) * 100) / 100 : null)
+  return [...groups.values()].map((g) => {
+    const visible = g.list.length >= EVAL_MIN_RESPONSES
+    // Moins de EVAL_MIN_RESPONSES réponses : rien n'est calculé ni envoyé (anonymat)
+    const items = visible ? evalItems(g.list, questions) : []
+    const criteria = items.filter((q) => q.type === 'note')
+    const overall = visible ? avg(criteria.map((c) => c.average).filter((x) => x !== null)) : null
+    // Commentaires dans un ordre mélangé (rien ne permet de relier un commentaire à une date de réponse)
+    const comments = visible ? g.list.map((r) => String(r.comment || '').trim()).filter(Boolean).map((x) => [Math.random(), x]).sort((a, b) => a[0] - b[0]).map((x) => x[1]) : []
+    return {
+      teacherId: g.teacherId, teacher: fullName(g.teacherId), matiereId: g.matiereId, matiere: matiereName(g.matiereId),
+      classes: [...g.classes].map((id) => db.classes.find((c) => c.id === id)?.name).filter(Boolean).sort(),
+      responses: g.list.length, visible, overall, criteria, items, comments,
+    }
+  }).sort((a, b) => a.teacher.localeCompare(b.teacher) || a.matiere.localeCompare(b.matiere))
+}
+
+// GET /api/evaluations/campaigns (direction pédagogique) : campagnes et taux de participation
+export async function listEvalCampaigns() {
+  await load()
+  requireUser('pedagogy')
+  const campaigns = [...(db.evalCampaigns || [])].sort((a, b) => (b.createdAt > a.createdAt ? 1 : -1))
+  return Promise.all(campaigns.map(async (c) => {
+    // Réponses attendues : pour chaque classe, ses étudiants actifs x ses enseignants
+    const expected = db.classes.reduce((n, cl) => n + db.users.filter((u) => u.role === 'student' && u.active && u.classeId === cl.id).length * classTeaching(cl.id).length, 0)
+    const responses = await platform.store.count('evalResponses', { campaignId: c.id })
+    return { ...clone(c), questions: evalQuestions(c), periode: db.periodes.find((p) => p.id === c.periodeId)?.name ?? '', open: evalOpen(c), expected, responses }
+  }))
+}
+
+// POST/PUT /api/evaluations/campaigns { id?, title, periodeId, startAt, endAt, questions: [{ label }] }
+// Une nouvelle campagne reste en brouillon : les étudiants n'y ont accès qu'après validation (setEvalCampaignStatus).
+// Les questions ne se modifient plus dès qu'une réponse est arrivée (les moyennes n'auraient plus de sens).
+export async function saveEvalCampaign(input = {}) {
+  await load()
+  const actor = requireUser('pedagogy')
+  const title = String(input.title || '').trim()
+  if (!title) throw new ApiError('Donnez un titre à la campagne (par exemple : Évaluation des enseignants - Semestre 1).')
+  if (!input.startAt || !input.endAt || new Date(input.endAt) <= new Date(input.startAt)) throw new ApiError('Indiquez une date de début et une date de fin après le début.')
+  const periodeId = input.periodeId ? Number(input.periodeId) : null
+  if (periodeId && !db.periodes.some((p) => p.id === periodeId)) throw new ApiError('Période introuvable.')
+  const questions = cleanEvalQuestions(input.questions)
+  db.evalCampaigns ||= []
+  const fields = { title, periodeId, startAt: new Date(input.startAt).toISOString(), endAt: new Date(input.endAt).toISOString() }
+  let id = Number(input.id) || null
+  if (id) {
+    const c = evalCampaignOf(id)
+    const sig = (qs) => JSON.stringify(qs.map((q) => [q.type, q.label, q.options || []]))
+    const same = sig(questions) === sig(evalQuestions(c))
+    if (!same && (await platform.store.count('evalResponses', { campaignId: c.id })) > 0) {
+      throw new ApiError('Des étudiants ont déjà répondu : les questions ne peuvent plus être modifiées.')
+    }
+    Object.assign(c, fields)
+    if (!same) c.questions = questions
+    audit(actor, 'modification_evaluation', title)
+  } else {
+    id = nextId('evalCampaign')
+    db.evalCampaigns.push({ id, schoolId: actor.schoolId, ...fields, status: 'brouillon', questions, createdAt: now(), createdBy: actor.id })
+    audit(actor, 'creation_evaluation', title)
+  }
+  save()
+  return { id }
+}
+
+// DELETE /api/evaluations/campaigns/{id} : seulement un brouillon (jamais ouvert aux étudiants)
+export async function deleteEvalCampaign(id) {
+  await load()
+  const actor = requireUser('pedagogy')
+  const c = evalCampaignOf(id)
+  if (c.status !== 'brouillon') throw new ApiError('Seul un brouillon peut être supprimé : une évaluation déjà ouverte se clôture.')
+  db.evalCampaigns = db.evalCampaigns.filter((x) => x.id !== c.id)
+  audit(actor, 'suppression_evaluation', c.title)
+  save()
+}
+
+// PUT /api/evaluations/campaigns/{id}/status { status: 'ouverte' | 'fermee' }
+// 'ouverte' : validation par la direction pédagogique, la section devient cliquable chez les étudiants.
+export async function setEvalCampaignStatus(id, status) {
+  await load()
+  const actor = requireUser('pedagogy')
+  if (!['ouverte', 'fermee'].includes(status)) throw new ApiError('État inconnu.')
+  const c = evalCampaignOf(id)
+  const wasDraft = c.status === 'brouillon'
+  c.status = status
+  if (status === 'ouverte' && wasDraft) {
+    c.openedAt = now()
+    for (const s of db.users.filter((u) => u.role === 'student' && u.active && classTeaching(u.classeId).length)) {
+      notify(s.id, 'Évaluez vos enseignants', `${c.title} : votre avis est anonyme et aide à améliorer les cours.`, '/etudiant/evaluations')
+    }
+  }
+  if (status === 'fermee') {
+    c.closedAt = now()
+    // Les enseignants peuvent consulter leurs résultats
+    for (const tid of new Set(db.teaching.map((t) => t.teacherId))) notify(tid, 'Résultats de l\'évaluation', `${c.title} : vos résultats sont disponibles.`, '/enseignant/evaluations')
+  }
+  audit(actor, status === 'fermee' ? 'cloture_evaluation' : wasDraft ? 'ouverture_evaluation' : 'reouverture_evaluation', c.title)
+  save()
+}
+
+// GET /api/evaluations/campaigns/{id}/results (direction pédagogique : toutes ; enseignant : les siennes, après la clôture)
+export async function evalResults(campaignId) {
+  await load()
+  const user = requireUser('pedagogy', 'teacher')
+  const c = evalCampaignOf(campaignId)
+  if (user.role === 'teacher' && c.status !== 'fermee') throw new ApiError('Les résultats seront disponibles à la clôture de la campagne.', 'forbidden', 403)
+  const responses = await platform.store.query('evalResponses', user.role === 'teacher' ? { campaignId: c.id, teacherId: user.id } : { campaignId: c.id })
+  const questions = evalQuestions(c)
+  const out = { campaign: { ...clone(c), questions, periode: db.periodes.find((p) => p.id === c.periodeId)?.name ?? '', open: evalOpen(c) }, criteria: questions, minResponses: EVAL_MIN_RESPONSES, rows: evalAggregate(responses, questions) }
+  if (user.role === 'pedagogy') out.dashboard = evalDashboard(responses, questions)
+  return out
+}
+
+// Tableau de bord de la direction pédagogique : participation (globale et par classe), moyennes de l'école par critère,
+// répartition des notes. Chiffres d'ensemble : ils ne désignent aucun étudiant.
+function evalDashboard(responses, questions) {
+  const avg = (xs) => (xs.length ? Math.round((xs.reduce((s, x) => s + x, 0) / xs.length) * 100) / 100 : null)
+  const byClass = db.classes.map((cl) => {
+    const students = db.users.filter((u) => u.role === 'student' && u.active && u.classeId === cl.id).length
+    const teachers = classTeaching(cl.id).length
+    const got = responses.filter((r) => r.classeId === cl.id).length
+    return { classeId: cl.id, classe: cl.name, level: cl.level, students, teachers, expected: students * teachers, responses: got }
+  }).filter((x) => x.expected > 0)
+  const expected = byClass.reduce((n, x) => n + x.expected, 0)
+  // École entière : moyennes des questions notées et répartition des réponses aux QCM (les réponses ouvertes
+  // se lisent enseignant par enseignant, dans la fiche détaillée)
+  const items = evalItems(responses, questions.filter((q) => q.type === 'note' || q.type === 'qcm'))
+  const criteria = items.filter((q) => q.type === 'note')
+  const qcm = items.filter((q) => q.type === 'qcm')
+  const distribution = [1, 2, 3, 4, 5].map((n) => ({ note: n, count: responses.reduce((s, r) => s + Object.values(r.scores || {}).filter((v) => Number(v) === n).length, 0) }))
+  return {
+    responses: responses.length, expected,
+    participation: expected ? Math.round((responses.length / expected) * 1000) / 10 : 0,
+    overall: avg(criteria.map((c) => c.average).filter((x) => x !== null)),
+    teachersEvaluated: new Set(responses.map((r) => r.teacherId)).size,
+    criteria, qcm, distribution, byClass,
+    comments: responses.filter((r) => String(r.comment || '').trim()).length,
+  }
+}
+
+// GET /api/teacher/evaluations : campagnes clôturées, avec les résultats de l'enseignant
+export async function myEvalResults() {
+  await load()
+  const user = requireUser('teacher')
+  const closed = (db.evalCampaigns || []).filter((c) => c.status === 'fermee').sort((a, b) => (b.endAt > a.endAt ? 1 : -1))
+  const pending = (db.evalCampaigns || []).filter((c) => c.status === 'ouverte').map((c) => ({ id: c.id, title: c.title, endAt: c.endAt }))
+  const results = []
+  for (const c of closed) {
+    const responses = await platform.store.query('evalResponses', { campaignId: c.id, teacherId: user.id })
+    results.push({ campaign: { id: c.id, title: c.title, periode: db.periodes.find((p) => p.id === c.periodeId)?.name ?? '', closedAt: c.closedAt ?? c.endAt }, rows: evalAggregate(responses, evalQuestions(c)) })
+  }
+  return { minResponses: EVAL_MIN_RESPONSES, pending, results }
+}
+
+// GET /api/student/evaluations : campagne ouverte, enseignants à évaluer et ceux déjà évalués
+export async function studentEvaluations() {
+  await load()
+  const user = requireUser('student')
+  const open = (db.evalCampaigns || []).filter(evalOpen).sort((a, b) => (a.endAt > b.endAt ? 1 : -1))
+  const out = []
+  for (const c of open) {
+    const done = await platform.store.query('evalParticipations', { campaignId: c.id, studentId: user.id })
+    out.push({
+      id: c.id, title: c.title, endAt: c.endAt, periode: db.periodes.find((p) => p.id === c.periodeId)?.name ?? '',
+      questions: evalQuestions(c),
+      teachers: classTeaching(user.classeId).map((t) => ({
+        teacherId: t.teacherId, teacher: fullName(t.teacherId), matiereId: t.matiereId, matiere: matiereName(t.matiereId),
+        done: done.some((d) => d.teacherId === t.teacherId && d.matiereId === t.matiereId),
+      })).sort((a, b) => a.teacher.localeCompare(b.teacher)),
+    })
+  }
+  return { campaigns: out }
+}
+
+// GET /api/student/evaluations/available : la section du menu est-elle cliquable ? (évaluation validée par la
+// direction pédagogique, dans ses dates, et au moins un enseignant affecté à la classe). Aucune lecture coûteuse.
+export async function evalAvailable() {
+  await load()
+  const user = requireUser('student')
+  return { open: (db.evalCampaigns || []).some(evalOpen) && classTeaching(user.classeId).length > 0 }
+}
+
+// POST /api/student/evaluations { campaignId, teacherId, matiereId, scores: { q1: 1..5 }, comment, answers: { q2: indice du
+// choix (QCM) | texte (question ouverte) } }. Notes et QCM obligatoires, questions ouvertes facultatives.
+// N'enregistre rien dans les données de référence : la réponse et la participation sont écrites ensemble, à part.
+export async function submitEvaluation(campaignId, teacherId, matiereId, scores = {}, comment = '', answers = {}) {
+  await load()
+  const user = requireUser('student')
+  const c = evalCampaignOf(campaignId)
+  if (!evalOpen(c)) throw new ApiError('Cette évaluation n\'est pas ouverte.')
+  const tid = Number(teacherId)
+  const mid = Number(matiereId)
+  if (!classTeaching(user.classeId).some((t) => t.teacherId === tid && t.matiereId === mid)) throw new ApiError('Cet enseignant n\'est pas affecté à votre classe pour cette matière.', 'forbidden', 403)
+  const clean = {}
+  const cleanAnswers = {}
+  for (const q of evalQuestions(c)) {
+    if (q.type === 'note') {
+      const n = Number(scores?.[q.key])
+      if (!Number.isInteger(n) || n < 1 || n > 5) throw new ApiError(`Donnez une note de 1 à 5 à la question « ${q.label} ».`)
+      clean[q.key] = n
+    } else if (q.type === 'qcm') {
+      const i = Number(answers?.[q.key])
+      if (!Number.isInteger(i) || i < 0 || i >= q.options.length) throw new ApiError(`Choisissez une réponse à la question « ${q.label} ».`)
+      cleanAnswers[q.key] = i
+    } else if (q.type === 'texte') {
+      const t = String(answers?.[q.key] ?? '').trim().slice(0, EVAL_ANSWER_MAX)
+      if (t) cleanAnswers[q.key] = t
+    }
+  }
+  const text = String(comment || '').trim().slice(0, EVAL_COMMENT_MAX)
+  const day = new Date().toISOString().slice(0, 10)
+  const rid = `${c.id}_${Math.random().toString(36).slice(2)}${Math.random().toString(36).slice(2)}`
+  const ok = await platform.store.createAll([
+    { collection: 'evalParticipations', id: `${c.id}_${user.id}_${tid}_${mid}`, data: { campaignId: c.id, studentId: user.id, teacherId: tid, matiereId: mid } },
+    { collection: 'evalResponses', id: rid, data: { campaignId: c.id, teacherId: tid, matiereId: mid, classeId: user.classeId, scores: clean, answers: cleanAnswers, comment: text, day } },
+  ])
+  if (!ok) throw new ApiError('Vous avez déjà évalué cet enseignant pour cette matière.')
+  return { ok: true }
 }
 
 // Remise à zéro de la démo (bouton dans les paramètres)

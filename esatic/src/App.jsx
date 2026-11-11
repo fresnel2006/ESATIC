@@ -38,6 +38,9 @@ import AdminUsers from './pages/admin/AdminUsers.jsx'
 import AdminStructure from './pages/admin/AdminStructure.jsx'
 import AdminEpreuves from './pages/admin/AdminEpreuves.jsx'
 import BulletinsDepot from './pages/BulletinsDepot.jsx'
+import PedagogyEvaluations from './pages/PedagogyEvaluations.jsx'
+import StudentEvaluations from './pages/student/StudentEvaluations.jsx'
+import TeacherEvaluations from './pages/teacher/TeacherEvaluations.jsx'
 import AdminJournal from './pages/admin/AdminJournal.jsx'
 import AdminParametres from './pages/admin/AdminParametres.jsx'
 
@@ -85,6 +88,7 @@ export default function App() {
         <Route path="/etudiant/resultats" element={<RequireAuth roles={['student']}><StudentResultats /></RequireAuth>} />
         <Route path="/etudiant/resultats/:attemptId" element={<RequireAuth roles={['student']}><StudentResultDetail /></RequireAuth>} />
         <Route path="/etudiant/annonces" element={<RequireAuth roles={['student']}><StudentAnnonces /></RequireAuth>} />
+        <Route path="/etudiant/evaluations" element={<RequireAuth roles={['student']}><StudentEvaluations /></RequireAuth>} />
         <Route path="/etudiant/epreuve/:id" element={<RequireAuth roles={['student']}><AssessmentDetail /></RequireAuth>} />
 
         <Route path="/enseignant" element={<RequireAuth roles={['teacher']}><TeacherHome /></RequireAuth>} />
@@ -97,6 +101,7 @@ export default function App() {
         <Route path="/enseignant/corrections/epreuve/:id" element={<RequireAuth roles={['teacher']}><CorrectionByQuestion /></RequireAuth>} />
         <Route path="/enseignant/resultats" element={<RequireAuth roles={['teacher']}><TeacherResultats /></RequireAuth>} />
         <Route path="/enseignant/classes" element={<RequireAuth roles={['teacher']}><TeacherClasses /></RequireAuth>} />
+        <Route path="/enseignant/evaluations" element={<RequireAuth roles={['teacher']}><TeacherEvaluations /></RequireAuth>} />
 
         <Route path="/surveillant/sessions" element={<RequireAuth roles={['proctor']}><ProctorSessions /></RequireAuth>} />
         <Route path="/surveillant/sessions/:id" element={<RequireAuth roles={['proctor']}><ProctorSessionDetail /></RequireAuth>} />
@@ -112,6 +117,7 @@ export default function App() {
         <Route path="/admin/parametres" element={<RequireAuth roles={['admin']}><AdminParametres /></RequireAuth>} />
 
         <Route path="/educateur/bulletins" element={<RequireAuth roles={['educator']}><BulletinsDepot /></RequireAuth>} />
+        <Route path="/direction/evaluations" element={<RequireAuth roles={['pedagogy']}><PedagogyEvaluations /></RequireAuth>} />
 
         <Route path="*" element={<NotFound />} />
       </Route>

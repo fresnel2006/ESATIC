@@ -124,7 +124,7 @@ const byRole = (args, user) => {
   if (user.role === 'student') return own()
   if (user.role === 'teacher') return { kind: 'teacher' }
   if (user.role === 'proctor') return { kind: 'exam' }
-  if (user.role === 'educator') return none()
+  if (user.role === 'educator' || user.role === 'pedagogy') return none()
   return all()
 }
 
@@ -166,6 +166,7 @@ const READ_FIRST = new Set([
   'myTeaching', 'listBank', 'listCopies', 'getCopy', 'autoGradeJobs', 'autoGradeTargets', 'copiesForQuestion',
   'listComments', 'assessmentResults', 'teacherClasses', 'listSessions', 'sessionDetail', 'listAlerts',
   'listAnnouncements', 'search', 'bulletinOptions', 'listBulletins', 'getBulletinFile', 'studentBulletins',
+  'listEvalCampaigns', 'evalResults', 'myEvalResults', 'studentEvaluations', 'submitEvaluation', 'evalAvailable',
   'studentHome',
 ])
 
@@ -469,6 +470,32 @@ async function removeFiles(keys) {
   } catch (err) {
     console.error('Fichiers non supprimés :', keys.join(', '), err.message)
   }
+}
+
+// ---------------------------------------------------------------------------
+// Petites collections lues et écrites directement (évaluation des enseignants : participations et réponses).
+// Hors des données de référence : des milliers de réponses ne ralentissent pas la plateforme.
+// ---------------------------------------------------------------------------
+
+// Création de plusieurs documents d'un coup (tout ou rien). false si l'un d'eux existe déjà.
+export async function storeCreateAll(items) {
+  const batch = firestore.batch()
+  for (const it of items) batch.create(firestore.collection(it.collection).doc(it.id), it.data)
+  try {
+    await batch.commit()
+    return true
+  } catch (err) {
+    if (err?.code === 6) return false // ALREADY_EXISTS
+    throw err
+  }
+}
+
+const where = (collection, filters) => Object.entries(filters).reduce((q, [f, v]) => q.where(f, '==', v), firestore.collection(collection))
+export async function storeQuery(collection, filters) {
+  return (await where(collection, filters).get()).docs.map((d) => d.data())
+}
+export async function storeCount(collection, filters) {
+  return (await where(collection, filters).count().get()).data().count
 }
 
 // Ajoute des notifications dans les boîtes de leurs destinataires (ajout atomique, sans transaction)

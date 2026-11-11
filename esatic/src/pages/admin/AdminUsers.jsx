@@ -56,7 +56,7 @@ function UserForm({ user, structure, onClose, onSaved }) {
         <div className="field">
           <label htmlFor="u-role">Rôle</label>
           <select id="u-role" className="select" value={f.role} onChange={(e) => set({ role: e.target.value })}>
-            {['student', 'teacher', 'proctor', 'educator', 'admin'].map((r) => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
+            {['student', 'teacher', 'proctor', 'educator', 'pedagogy', 'admin'].map((r) => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
           </select>
         </div>
         <div className="field"><label htmlFor="u-ln">Nom</label><input id="u-ln" className="input" value={f.lastName} onChange={(e) => set({ lastName: e.target.value })} /></div>
@@ -285,7 +285,7 @@ export default function AdminUsers() {
         <input className="input" placeholder="Nom, matricule ou email" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Rechercher" />
         <select className="select" value={role} onChange={(e) => setRole(e.target.value)} aria-label="Rôle">
           <option value="">Tous les rôles</option>
-          {['student', 'teacher', 'proctor', 'educator', 'admin'].map((r) => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
+          {['student', 'teacher', 'proctor', 'educator', 'pedagogy', 'admin'].map((r) => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
         </select>
         <select className="select" value={classe} onChange={(e) => setClasse(e.target.value)} aria-label="Classe">
           <option value="">Toutes les classes</option>

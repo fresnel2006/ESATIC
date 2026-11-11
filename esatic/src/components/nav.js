@@ -1,7 +1,7 @@
 import {
   House, Files, CalendarClock, FileBadge, Megaphone,
   FolderKanban, Library, ClipboardCheck, ChartColumn, Users,
-  MonitorPlay, BellRing, History,
+  MonitorPlay, BellRing, History, Star, Award,
   LayoutDashboard, Network, FileStack, ScrollText, Settings, UserCog,
 } from 'lucide-react'
 
@@ -14,6 +14,9 @@ export const NAV = {
     { to: '/etudiant/examens', label: 'Examens', icon: CalendarClock, mobile: true },
     { to: '/etudiant/resultats', label: 'Bulletins', icon: FileBadge, mobile: true },
     { to: '/etudiant/annonces', label: 'Annonces', icon: Megaphone, mobile: true },
+    // Visible en permanence, cliquable seulement quand la direction pédagogique a validé une évaluation
+    { to: '/etudiant/evaluations', label: 'Évaluer mes enseignants', icon: Star, gate: 'evaluation',
+      lockedHint: 'Pas encore disponible : la direction pédagogique doit d\'abord ouvrir l\'évaluation des enseignants.' },
   ],
   teacher: [
     { to: '/enseignant', label: 'Accueil', icon: House, end: true, mobile: true },
@@ -22,11 +25,15 @@ export const NAV = {
     { to: '/enseignant/corrections', label: 'Corrections', icon: ClipboardCheck, mobile: true },
     { to: '/enseignant/resultats', label: 'Résultats', icon: ChartColumn, mobile: true },
     { to: '/enseignant/classes', label: 'Classes', icon: Users },
+    { to: '/enseignant/evaluations', label: 'Mes évaluations', icon: Award },
   ],
   proctor: [
     { to: '/surveillant/sessions', label: 'Sessions', icon: MonitorPlay, mobile: true },
     { to: '/surveillant/alertes', label: 'Alertes', icon: BellRing, mobile: true },
     { to: '/surveillant/historique', label: 'Historique', icon: History, mobile: true },
+  ],
+  pedagogy: [
+    { to: '/direction/evaluations', label: 'Évaluation des enseignants', icon: Star, mobile: true },
   ],
   educator: [
     { to: '/educateur/bulletins', label: 'Bulletins', icon: FileBadge, mobile: true },

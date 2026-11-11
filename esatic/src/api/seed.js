@@ -107,6 +107,7 @@ export const DEMO_ACCOUNTS = [
   { role: 'teacher', login: 'ENS001', password: 'Prof2026!', label: 'Enseignant' },
   { role: 'proctor', login: 'SUR001', password: 'Surv2026!', label: 'Surveillant' },
   { role: 'educator', login: 'EDU001', password: 'Educ2026!', label: 'Éducateur' },
+  { role: 'pedagogy', login: 'DIR001', password: 'Direction2026!', label: 'Direction pédagogique' },
   { role: 'student', login: 'ETU24001', password: 'Etudiant2026!', label: 'Étudiant' },
   { role: 'student', login: 'ETU24006', password: 'Provisoire1', label: 'Étudiant (1re connexion)' },
 ]
@@ -114,7 +115,7 @@ export const DEMO_ACCOUNTS = [
 export async function buildSeed(hash = hashPassword) {
   const SCHOOL = 1
   const pw = {}
-  for (const p of ['Admin2026!', 'Prof2026!', 'Surv2026!', 'Educ2026!', 'Etudiant2026!', 'Provisoire1']) {
+  for (const p of ['Admin2026!', 'Prof2026!', 'Surv2026!', 'Educ2026!', 'Direction2026!', 'Etudiant2026!', 'Provisoire1']) {
     pw[p] = await hash(p)
   }
 
@@ -146,6 +147,7 @@ export async function buildSeed(hash = hashPassword) {
     u(3, 'teacher', 'ENS002', 'Awa', 'Bamba', { passwordHash: pw['Prof2026!'] }),
     u(4, 'proctor', 'SUR001', 'Mamadou', 'Koné', { passwordHash: pw['Surv2026!'] }),
     u(5, 'educator', 'EDU001', 'Adjoua', 'Brou', { passwordHash: pw['Educ2026!'] }),
+    u(6, 'pedagogy', 'DIR001', 'Koffi', 'Assemien', { passwordHash: pw['Direction2026!'] }),
     u(10, 'student', 'ETU24001', 'Fresnel', 'Traore', { passwordHash: pw['Etudiant2026!'], classeId: 1 }),
     u(11, 'student', 'ETU24002', 'Aminata', 'Diallo', { passwordHash: pw['Etudiant2026!'], classeId: 1 }),
     u(12, 'student', 'ETU24003', 'Jean', 'Konan', { passwordHash: pw['Etudiant2026!'], classeId: 1 }),

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import {
   ArrowUpRight, ArrowDownRight, Search, Bell, ChevronsLeft, ChevronsRight,
-  UserRound, KeyRound, Moon, Sun, LogOut, Ellipsis, X, ChevronDown,
+  UserRound, KeyRound, Moon, Sun, LogOut, Ellipsis, X, ChevronDown, Lock,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext.jsx'
 import { NAV } from './nav.js'
@@ -187,6 +187,20 @@ function AccountMenu({ user, theme, toggleTheme, compact }) {
   )
 }
 
+// Entrées conditionnelles du menu (gate) : l'évaluation des enseignants n'est cliquable chez l'étudiant
+// qu'après validation par la direction pédagogique. Vérifié à l'ouverture, à chaque page et au retour sur l'onglet.
+function useGates(role, pathname) {
+  const [gates, setGates] = useState({})
+  useEffect(() => {
+    if (role !== 'student') return
+    const check = () => { if (!document.hidden) api.evalAvailable().then((r) => setGates({ evaluation: !!r.open })).catch(() => {}) }
+    check()
+    document.addEventListener('visibilitychange', check)
+    return () => document.removeEventListener('visibilitychange', check)
+  }, [role, pathname])
+  return gates
+}
+
 export default function AppLayout() {
   const { user } = useAuth()
   const location = useLocation()
@@ -194,6 +208,8 @@ export default function AppLayout() {
   const [theme, toggleTheme] = useTheme()
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem('esatic-sidebar') === '1')
   const [moreOpen, setMoreOpen] = useState(false)
+  const gates = useGates(user.role, location.pathname)
+  const locked = (it) => it.gate && !gates[it.gate]
   const items = NAV[user.role] || []
   const title = currentTitle(items, location.pathname)
   const mobileItems = items.filter((i) => i.mobile).slice(0, items.length > 5 ? 4 : 5)
@@ -218,7 +234,13 @@ export default function AppLayout() {
         </div>
         <div className="nav-section">Menu</div>
         <nav className="sidebar-nav">
-          {items.map((it) => (
+          {items.map((it) => locked(it) ? (
+            <span key={it.to} className="nav-item locked" aria-disabled="true" title={it.lockedHint}>
+              <it.icon size={20} strokeWidth={1.6} />
+              <span className="nav-label">{it.label}</span>
+              <Lock size={13} strokeWidth={1.8} className="nav-lock" />
+            </span>
+          ) : (
             <NavLink key={it.to} to={it.to} end={it.end} className="nav-item" title={collapsed ? it.label : undefined}>
               <it.icon size={20} strokeWidth={1.6} />
               <span className="nav-label">{it.label}</span>
@@ -276,7 +298,11 @@ export default function AppLayout() {
               <div className="spacer" />
               <button className="icon-btn" onClick={() => setMoreOpen(false)} aria-label="Fermer"><X {...ICON} /></button>
             </div>
-            {moreItems.map((it) => (
+            {moreItems.map((it) => locked(it) ? (
+              <span key={it.to} className="sheet-item locked" aria-disabled="true" title={it.lockedHint}>
+                <it.icon {...ICON} /> {it.label} <Lock size={14} strokeWidth={1.8} className="nav-lock" />
+              </span>
+            ) : (
               <NavLink key={it.to} to={it.to} className="sheet-item">
                 <it.icon {...ICON} /> {it.label}
               </NavLink>

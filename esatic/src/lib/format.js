@@ -79,6 +79,7 @@ export const ROLE_LABELS = {
   teacher: 'Enseignant',
   proctor: 'Surveillant',
   educator: 'Éducateur',
+  pedagogy: 'Direction pédagogique',
   student: 'Étudiant',
 }
 
@@ -87,6 +88,7 @@ export const ROLE_HOME = {
   teacher: '/enseignant',
   proctor: '/surveillant/sessions',
   educator: '/educateur/bulletins',
+  pedagogy: '/direction/evaluations',
   student: '/etudiant',
 }
 
@@ -240,6 +242,12 @@ export const ACTION_LABELS = {
   desactivation_compte: 'Désactivation de compte',
   import_etudiants: 'Import d\'étudiants',
   import_enseignants: 'Import d\'enseignants',
+  creation_evaluation: 'Préparation d\'une évaluation des enseignants',
+  suppression_evaluation: 'Suppression d\'un brouillon d\'évaluation des enseignants',
+  ouverture_evaluation: 'Validation d\'une évaluation des enseignants (ouverte aux étudiants)',
+  modification_evaluation: 'Modification d\'une évaluation des enseignants',
+  cloture_evaluation: 'Clôture d\'une évaluation des enseignants',
+  reouverture_evaluation: 'Réouverture d\'une évaluation des enseignants',
   creation_classe: 'Création de classe',
   modification_classe: 'Modification de classe',
   suppression_classe: 'Suppression de classe',
