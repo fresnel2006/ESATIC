@@ -252,8 +252,11 @@ export function Modal({ title, onClose, children, footer, wide }) {
   )
 }
 
+// Confirmation d'une action. Si l'action échoue, le message d'erreur s'affiche dans la fenêtre
+// (sinon le clic semble ne rien faire).
 export function Confirm({ title, message, confirmLabel = 'Confirmer', danger, onConfirm, onClose }) {
   const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
   return (
     <Modal
       title={title}
@@ -266,20 +269,24 @@ export function Confirm({ title, message, confirmLabel = 'Confirmer', danger, on
             disabled={busy}
             onClick={async () => {
               setBusy(true)
+              setError('')
               try {
                 await onConfirm()
                 onClose()
+              } catch (e) {
+                setError(e?.message || String(e))
               } finally {
                 setBusy(false)
               }
             }}
           >
-            {confirmLabel}
+            {busy && <Loader2 {...ICON} className="spin" />} {confirmLabel}
           </button>
         </>
       }
     >
       <p>{message}</p>
+      {error && <div style={{ marginTop: 12 }}><Notice kind="danger">{error}</Notice></div>}
     </Modal>
   )
 }

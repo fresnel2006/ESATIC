@@ -5,7 +5,7 @@ import * as api from '../../api/index.js'
 import { useToast } from '../../context/ToastContext.jsx'
 import { useAuth } from '../../context/AuthContext.jsx'
 import { Confirm, ErrorBox, Loader, Notice, PageHead, ResponsiveTable, StatusBadge, useAsync, ICON } from '../../components/ui.jsx'
-import { DEMO_TOOLS } from '../../config.js'
+import { API_MODE, DEMO_TOOLS } from '../../config.js'
 import { LANGUAGES } from '../../lib/format.js'
 import { canRunLanguage } from '../../lib/useExecution.js'
 
@@ -108,7 +108,8 @@ export default function AdminParametres() {
       <ExecutionCard />
       <ToolsCard />
 
-      {DEMO_TOOLS && <div className="card"><div className="card-header"><h2>Démonstration</h2></div><div className="card-body row-wrap" style={{ justifyContent: 'space-between' }}>
+      {/* Seulement dans la démo hors ligne : sur le vrai serveur, tout effacer est refusé (données réelles de l'école) */}
+      {DEMO_TOOLS && API_MODE === 'demo' && <div className="card"><div className="card-header"><h2>Démonstration</h2></div><div className="card-body row-wrap" style={{ justifyContent: 'space-between' }}>
         <p className="small muted" style={{ maxWidth: 520 }}>Efface toutes les données et revient aux données de démonstration d'origine.</p>
         <button className="btn btn-secondary" onClick={() => setResetDemo(true)}><RotateCcw {...ICON} /> Réinitialiser la démo</button>
       </div></div>}
