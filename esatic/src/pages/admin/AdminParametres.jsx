@@ -90,7 +90,6 @@ export default function AdminParametres() {
 
       <div className="card"><div className="card-header"><h2>Sécurité</h2></div><div className="card-body">
         <Toggle title="Une seule session active par compte" desc="Pour les étudiants, c'est toujours le cas : se connecter sur un autre poste ferme l'ancienne session. Activez pour l'appliquer aussi au personnel." checked={!!st.singleSession} onChange={(v) => set({ singleSession: v })} />
-        <Toggle title="Safe Exam Browser par défaut" desc="Proposé activé à la création des nouveaux examens." checked={!!st.sebDefault} onChange={(v) => set({ sebDefault: v })} />
         <div className="toggle-row">
           <div><div className="t">Intervalle de sauvegarde automatique</div><div className="d">Entre 20 et 30 secondes. La sauvegarde n'a lieu que si une réponse a changé.</div></div>
           <select className="select" style={{ width: 110 }} value={st.autosaveSeconds} onChange={(e) => set({ autosaveSeconds: Number(e.target.value) })} aria-label="Intervalle de sauvegarde">

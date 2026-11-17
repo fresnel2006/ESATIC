@@ -175,7 +175,7 @@ export async function buildSeed(hash = hashPassword) {
 
   // exitWarnings : 2 = avertissement aux 1re et 2e sorties, copie envoyée à la 3e ; null = signalement seulement
   const security = (over = {}) => ({
-    fullscreen: true, blockPaste: true, sebRequired: false, sebKeys: '', shuffleQuestions: false, showResultsAfter: false,
+    fullscreen: true, blockPaste: true, shuffleQuestions: false, showResultsAfter: false,
     exitWarnings: over.fullscreen === false ? null : 2, ...over,
   })
 
@@ -523,7 +523,7 @@ public class Main {
     version: 1,
     school: {
       id: SCHOOL, name: 'École Supérieure Africaine des TIC', shortName: 'ESATIC', city: 'Abidjan', demo: true,
-      settings: { academicYear: '2026-2027', autosaveSeconds: 25, singleSession: true, showRank: false, sebDefault: false, passwordMinLength: 8 },
+      settings: { academicYear: '2026-2027', autosaveSeconds: 25, singleSession: true, showRank: false, passwordMinLength: 8 },
     },
     filieres, classes, matieres, periodes, users, teaching, assessments, sessions, attempts, bank,
     announcements, notifications, audit,

@@ -20,7 +20,7 @@ export async function buildSchoolData({ matricule, firstName, lastName, email },
     version: 1,
     school: {
       id: 1, name: 'École Supérieure Africaine des TIC', shortName: 'ESATIC', city: 'Abidjan', demo: false,
-      settings: { academicYear, autosaveSeconds: 25, singleSession: true, showRank: false, sebDefault: false, passwordMinLength: 8 },
+      settings: { academicYear, autosaveSeconds: 25, singleSession: true, showRank: false, passwordMinLength: 8 },
     },
     filieres,
     classes,

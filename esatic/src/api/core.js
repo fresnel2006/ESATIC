@@ -160,6 +160,8 @@ function migrate() {
       changed = true
     }
     if (a.security?.exitWarnings === 1) { a.security.exitWarnings = 2; changed = true } // ancienne règle (envoi à la 2e)
+    // Safe Exam Browser retiré de la plateforme
+    if (a.security && ('sebRequired' in a.security || 'sebKeys' in a.security)) { delete a.security.sebRequired; delete a.security.sebKeys; changed = true }
   }
   // Ajouts de démonstration : seulement dans une base de démonstration, jamais dans la vraie base de l'école.
   // (Base de démo : school.demo vrai ; les bases de démo plus anciennes se reconnaissent au compte ETU24001.)
@@ -911,6 +913,14 @@ export async function myTeaching() {
 
 // Exercices d'une épreuve : [{ id, title, intro }], chaque question porte le sectionId de son exercice.
 // Sans exercice, les questions forment une liste simple. Les questions sont rangées exercice par exercice.
+// Règles de sécurité d'une épreuve : seulement celles que la plateforme applique (plein écran par défaut)
+function cleanSecurity(sec = {}) {
+  return {
+    fullscreen: sec.fullscreen !== false, blockPaste: !!sec.blockPaste, shuffleQuestions: !!sec.shuffleQuestions,
+    showResultsAfter: !!sec.showResultsAfter, exitWarnings: sec.exitWarnings ? 2 : null,
+  }
+}
+
 function cleanSections(a) {
   const sections = (a.sections || [])
     .filter((x) => x && x.id)
@@ -1008,7 +1018,7 @@ export async function saveAssessment(input, publish = false) {
     startAt: a.startAt || null, endAt: a.endAt || null,
     durationMin: a.kind === 'examen' ? Number(a.durationMin) : null,
     maxAttempts: a.kind === 'devoir' ? Math.max(1, Number(a.maxAttempts) || 1) : 1,
-    security: a.security, questions: a.questions, sections: a.sections,
+    security: cleanSecurity(a.security), questions: a.questions, sections: a.sections,
     languages: (a.languages || []).filter((l) => TOOLS[l]?.code),
   }
   let saved
@@ -1153,7 +1163,7 @@ function studentAssessmentView(a, student) {
     matiere: d.matiere, classe: d.classe, teacher: d.teacher, startAt: a.startAt, endAt: a.endAt,
     durationMin: a.durationMin, maxAttempts: a.maxAttempts, maxPoints: d.maxPoints, questionCount: d.questionCount,
     languages: a.languages || [],
-    security: { fullscreen: a.security.fullscreen, blockPaste: a.security.blockPaste, sebRequired: a.security.sebRequired, exitWarnings: a.security.exitWarnings ?? null },
+    security: { fullscreen: a.security.fullscreen, blockPaste: a.security.blockPaste, exitWarnings: a.security.exitWarnings ?? null },
     sessionStatus: d.session?.status ?? null, room: d.session?.room ?? '',
     attemptsUsed: atts.length,
     attemptInProgress: atts.find((x) => x.status === 'en_cours')?.id ?? null,
