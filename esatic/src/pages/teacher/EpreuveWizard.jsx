@@ -28,7 +28,8 @@ function emptyAssessment() {
     id: null, title: '', description: '', kind: 'devoir', matiereId: '', classeId: '', classeIds: [],
     startAt: start.toISOString(), endAt: end.toISOString(), durationMin: 60, maxAttempts: 1,
     languages: [],
-    security: { fullscreen: false, blockPaste: true, sebRequired: false, sebKeys: '', shuffleQuestions: false, exitWarnings: null },
+    // Plein écran obligatoire par défaut (devoirs comme examens) ; l'enseignant peut le décocher
+    security: { fullscreen: true, blockPaste: true, sebRequired: false, sebKeys: '', shuffleQuestions: false, exitWarnings: null },
     questions: [], status: 'brouillon',
   }
 }
@@ -289,7 +290,7 @@ export default function EpreuveWizard() {
                   ['examen', 'Examen surveillé', 'Créneau fixe, chronomètre, code d\'accès donné par le surveillant, règles de sécurité.'],
                 ].map(([k, t, d]) => (
                   <label key={k} className={`choice ${a.kind === k ? 'selected' : ''}`} style={{ alignItems: 'flex-start' }}>
-                    <input type="radio" name="kind" checked={a.kind === k} disabled={isPublished} onChange={() => set({ kind: k, security: { ...a.security, fullscreen: k === 'examen', exitWarnings: k === 'examen' ? 2 : null } })} />
+                    <input type="radio" name="kind" checked={a.kind === k} disabled={isPublished} onChange={() => set({ kind: k, security: { ...a.security, fullscreen: true, exitWarnings: k === 'examen' ? 2 : null } })} />
                     <span><strong>{t}</strong><span className="small muted" style={{ display: 'block' }}>{d}</span></span>
                   </label>
                 ))}
@@ -452,7 +453,7 @@ export default function EpreuveWizard() {
 
         {step === 3 && (
           <div>
-            <Toggle title="Plein écran obligatoire" desc="Une sortie du plein écran est enregistrée et un message calme invite l'étudiant à y revenir. Personne n'est exclu automatiquement." checked={a.security.fullscreen} onChange={(v) => setSec({ fullscreen: v })} />
+            <Toggle title="Plein écran obligatoire" desc="Activé par défaut : l'épreuve s'ouvre en plein écran et chaque sortie est enregistrée dans le journal de la copie." checked={a.security.fullscreen} onChange={(v) => setSec({ fullscreen: v })} />
             <Toggle
               title="Envoyer la copie à la 3e sortie"
               desc="Aux 1re et 2e sorties de l'épreuve (plein écran quitté ou changement de fenêtre), un avertissement s'affiche. À la 3e sortie, la copie est envoyée automatiquement avec les réponses déjà saisies. Désactivé : les sorties sont seulement signalées."
