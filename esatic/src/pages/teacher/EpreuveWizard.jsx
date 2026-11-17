@@ -28,8 +28,7 @@ function emptyAssessment() {
     id: null, title: '', description: '', kind: 'devoir', matiereId: '', classeId: '', classeIds: [],
     startAt: start.toISOString(), endAt: end.toISOString(), durationMin: 60, maxAttempts: 1,
     languages: [],
-    // Plein écran obligatoire par défaut (devoirs comme examens) ; l'enseignant peut le décocher
-    security: { fullscreen: true, blockPaste: true, shuffleQuestions: false, exitWarnings: null },
+    security: { fullscreen: false, blockPaste: true, sebRequired: false, sebKeys: '', shuffleQuestions: false, exitWarnings: null },
     questions: [], status: 'brouillon',
   }
 }
@@ -290,7 +289,7 @@ export default function EpreuveWizard() {
                   ['examen', 'Examen surveillé', 'Créneau fixe, chronomètre, code d\'accès donné par le surveillant, règles de sécurité.'],
                 ].map(([k, t, d]) => (
                   <label key={k} className={`choice ${a.kind === k ? 'selected' : ''}`} style={{ alignItems: 'flex-start' }}>
-                    <input type="radio" name="kind" checked={a.kind === k} disabled={isPublished} onChange={() => set({ kind: k, security: { ...a.security, fullscreen: true, exitWarnings: k === 'examen' ? 2 : null } })} />
+                    <input type="radio" name="kind" checked={a.kind === k} disabled={isPublished} onChange={() => set({ kind: k, security: { ...a.security, fullscreen: k === 'examen', exitWarnings: k === 'examen' ? 2 : null } })} />
                     <span><strong>{t}</strong><span className="small muted" style={{ display: 'block' }}>{d}</span></span>
                   </label>
                 ))}
@@ -453,7 +452,7 @@ export default function EpreuveWizard() {
 
         {step === 3 && (
           <div>
-            <Toggle title="Plein écran obligatoire" desc="Activé par défaut : l'épreuve s'ouvre en plein écran et chaque sortie est enregistrée dans le journal de la copie." checked={a.security.fullscreen} onChange={(v) => setSec({ fullscreen: v })} />
+            <Toggle title="Plein écran obligatoire" desc="Une sortie du plein écran est enregistrée et un message calme invite l'étudiant à y revenir. Personne n'est exclu automatiquement." checked={a.security.fullscreen} onChange={(v) => setSec({ fullscreen: v })} />
             <Toggle
               title="Envoyer la copie à la 3e sortie"
               desc="Aux 1re et 2e sorties de l'épreuve (plein écran quitté ou changement de fenêtre), un avertissement s'affiche. À la 3e sortie, la copie est envoyée automatiquement avec les réponses déjà saisies. Désactivé : les sorties sont seulement signalées."
@@ -462,6 +461,13 @@ export default function EpreuveWizard() {
             />
             <Toggle title="Bloquer le copier-coller externe" desc="Copier, couper, coller, glisser-déposer et clic droit sont bloqués. Dans les zones de réponse, l'étudiant peut recoller ce qu'il a lui-même copié." checked={a.security.blockPaste} onChange={(v) => setSec({ blockPaste: v })} />
             <Toggle title="Mélanger l'ordre des questions" desc="Chaque étudiant reçoit les questions dans un ordre différent." checked={a.security.shuffleQuestions} onChange={(v) => setSec({ shuffleQuestions: v })} />
+            <Toggle title="Exiger Safe Exam Browser" desc="La clé du navigateur est vérifiée par le serveur. Réservé aux postes de la salle équipés de SEB." checked={a.security.sebRequired} onChange={(v) => setSec({ sebRequired: v })} disabled={a.kind !== 'examen'} />
+            {a.security.sebRequired && (
+              <div className="field" style={{ marginTop: 10 }}>
+                <label htmlFor="w-seb">Clés Browser Exam Key autorisées (une par ligne)</label>
+                <textarea id="w-seb" className="textarea mono" value={a.security.sebKeys} onChange={(e) => setSec({ sebKeys: e.target.value })} />
+              </div>
+            )}
             <div style={{ marginTop: 12 }}>
               <Notice>Tous les événements (sorties du plein écran, changements d'onglet, collages bloqués, gros blocs de code apparus d'un coup) sont horodatés dans le journal de chaque copie. Le surveillant et l'enseignant décident.</Notice>
             </div>
@@ -478,7 +484,7 @@ export default function EpreuveWizard() {
               <div><div className="label">{a.kind === 'examen' ? 'Durée' : 'Tentatives'}</div><div>{a.kind === 'examen' ? `${a.durationMin} min` : a.maxAttempts}</div></div>
               <div><div className="label">Questions</div><div>{a.questions.length} - {total} points</div></div>
               <div><div className="label">Langage</div><div>{codeLangs.length ? codeLangs.map((l) => TOOLS[l].label).join(', ') : '-'}</div></div>
-              <div className="span-2"><div className="label">Sécurité</div><div>{[a.security.fullscreen && 'Plein écran', a.security.exitWarnings && 'Copie envoyée à la 3e sortie', a.security.blockPaste && 'Copier-coller externe bloqué', a.security.shuffleQuestions && 'Ordre mélangé'].filter(Boolean).join(', ') || 'Aucune règle'}</div></div>
+              <div className="span-2"><div className="label">Sécurité</div><div>{[a.security.fullscreen && 'Plein écran', a.security.exitWarnings && 'Copie envoyée à la 3e sortie', a.security.blockPaste && 'Copier-coller externe bloqué', a.security.shuffleQuestions && 'Ordre mélangé', a.security.sebRequired && 'Safe Exam Browser'].filter(Boolean).join(', ') || 'Aucune règle'}</div></div>
             </div>
             <div className="stack-sm">
               <span className="label">Aperçu des questions (vue étudiant)</span>
