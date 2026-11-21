@@ -2,7 +2,7 @@
 // on choisit une matière, on coche une ou plusieurs classes (rangées de la L1 au M2), puis « Attribuer ».
 import { useState } from 'react'
 import { Plus, X } from 'lucide-react'
-import { LEVELS, LEVEL_NAMES } from '../api/seed.js'
+import { LEVELS, LEVEL_NAMES } from '../api/constants.js'
 
 
 export default function TeacherAssignments({ classes, matieres, value, onChange }) {

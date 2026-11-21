@@ -6,6 +6,8 @@
 
 import { buildSeed, hashPassword, DEFAULT_TOOLS, applyDemoSections, schoolStructure, STRUCTURE_VERSION, LEVELS } from './seed.js'
 import { buildExtraExams } from './seedExams.js'
+import { ApiError, languagesOf, questionTool, generatePassword, maxPoints, EVENT_WEIGHTS, riskScore, mentionFor } from './shared.js'
+export { ApiError, languagesOf, questionTool, generatePassword, maxPoints, EVENT_WEIGHTS, riskScore, mentionFor }
 import { TOOLS, SQL_LIMITS, sqlSizeKb, DIAGRAM_MAX_KB } from '../lib/format.js'
 import { TEST_MODE } from '../config.js'
 import { BROWSER_LANGS, runInBrowser, sameOutput } from '../lib/browserRunner.js'
@@ -68,13 +70,6 @@ export function configurePlatform(overrides) {
   demoDb = null
 }
 
-export class ApiError extends Error {
-  constructor(message, code = 'error', status = 400) {
-    super(message)
-    this.code = code
-    this.status = status
-  }
-}
 
 // Données de travail. En démo : une seule base, celle du navigateur.
 // Sur le serveur : les données de la requête en cours (platform.getDb), préparées avant l'appel et
@@ -275,18 +270,6 @@ const studentsOf = (a) => {
   return db.users.filter((u) => u.role === 'student' && ids.includes(u.classeId))
 }
 
-// Langages de programmation utilisés par une liste de questions
-export function languagesOf(questions = []) {
-  return [...new Set(questions.filter((q) => q.type === 'code').map((q) => q.data?.language).filter(Boolean))]
-}
-
-// Outils d'une question : 'python', 'sql', 'html'... ; aucun pour QCM et questions ouvertes
-export function questionTool(q) {
-  if (q.type === 'code') return q.data?.language
-  if (q.type === 'sql') return 'sql'
-  if (q.type === 'html') return 'html'
-  return null
-}
 
 function save() {
   platform.writeDb(platform.server ? null : demoDb)
@@ -313,11 +296,6 @@ function randomCode(len = 6) {
   return Array.from(arr, (n) => chars[n % chars.length]).join('')
 }
 
-export function generatePassword() {
-  const chars = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789'
-  const arr = crypto.getRandomValues(new Uint32Array(10))
-  return Array.from(arr, (n) => chars[n % chars.length]).join('')
-}
 
 // ---------------------------------------------------------------------------
 // Authentification
@@ -837,9 +815,6 @@ export async function adminStats() {
 // Épreuves (devoirs et examens)
 // ---------------------------------------------------------------------------
 
-export function maxPoints(assessment) {
-  return (assessment.questions || []).reduce((s, q) => s + Number(q.points || 0), 0)
-}
 
 function decorateAssessment(a) {
   return {
@@ -1522,18 +1497,7 @@ const LANGUAGE_NAMES = { c: 'code C', cpp: 'code C++', java: 'code Java', php: '
 // Correction (enseignant)
 // ---------------------------------------------------------------------------
 
-export const EVENT_WEIGHTS = {
-  fullscreen_exit: 3, tab_hidden: 3, window_blur: 1, paste_blocked: 4, copy_blocked: 1,
-  drop_blocked: 2, contextmenu_blocked: 1, big_insert: 5, devtools_key: 2,
-  navigation_away: 3,
-  window_left: 3,
-  auto_submitted_exits: 5, // signalé au surveillant et à l'enseignant
-}
 
-export function riskScore(events = []) {
-  const s = events.reduce((sum, e) => sum + (EVENT_WEIGHTS[e.type] || 0), 0)
-  return Math.min(100, s * 4)
-}
 
 // GET /api/grading?assessmentId=
 export async function listCopies(assessmentId = null) {
@@ -2097,14 +2061,6 @@ export async function search(qs) {
 
 const round2 = (n) => Math.round(n * 100) / 100
 
-export function mentionFor(avg) {
-  if (avg === null || avg === undefined) return '-'
-  if (avg >= 16) return 'Très bien'
-  if (avg >= 14) return 'Bien'
-  if (avg >= 12) return 'Assez bien'
-  if (avg >= 10) return 'Passable'
-  return 'Insuffisant'
-}
 
 export const BULLETIN_MAX_BYTES = 2 * 1024 * 1024
 const BULLETIN_TYPES = [
@@ -2753,7 +2709,7 @@ const ABSENCE_STAFF = ['pedagogy', 'educator', 'admin']
 const ATTENDANCE_STATUSES = ['present', 'absent', 'retard']
 const ATTENDANCE_EDIT_DAYS = 30
 // Créneaux du cahier d'appels de l'ESATIC : 1 = 7 h 30 - 10 h 00, 2 = 10 h 15 - 12 h 45, 3 = 14 h 00 - 16 h 30
-// (du lundi au samedi ; le samedi, seulement le matin)
+// (du lundi au vendredi : pas d'appel le samedi)
 export const ATTENDANCE_SLOTS = { 1: ['07:30', '10:00'], 2: ['10:15', '12:45'], 3: ['14:00', '16:30'] }
 const slotOfStart = (start) => Number(Object.keys(ATTENDANCE_SLOTS).find((k) => ATTENDANCE_SLOTS[k][0] === start)) || null
 const weekdayOf = (date) => new Date(`${date}T12:00:00Z`).getUTCDay() // 0 dimanche ... 6 samedi
@@ -2802,7 +2758,7 @@ export async function attendanceOptions() {
   const monday = mondayOf(today)
   return {
     classes, today, minDate: isoDay(new Date(Date.now() - ATTENDANCE_EDIT_DAYS * 864e5)), editDays: ATTENDANCE_EDIT_DAYS, slots: ATTENDANCE_SLOTS,
-    week: [0, 1, 2, 3, 4, 5].map((i) => addDays(monday, i)),
+    week: [0, 1, 2, 3, 4].map((i) => addDays(monday, i)), // lundi au vendredi
   }
 }
 
@@ -2836,8 +2792,7 @@ export async function saveAttendance(input = {}) {
   const slot = Number(input.slot)
   if (!ATTENDANCE_SLOTS[slot]) throw new ApiError('Choisissez le créneau du cours (1, 2 ou 3).')
   const wd = weekdayOf(date)
-  if (wd === 0) throw new ApiError('Pas de cours le dimanche.')
-  if (wd === 6 && slot === 3) throw new ApiError('Le samedi, les cours ont lieu seulement le matin (créneaux 1 et 2).')
+  if (wd === 0 || wd === 6) throw new ApiError('Pas d\'appel le samedi ni le dimanche : l\'appel se fait du lundi au vendredi.')
   const [start, end] = ATTENDANCE_SLOTS[slot]
   const minutes = minutesOf(end) - minutesOf(start)
   const roster = classStudents(classeId)

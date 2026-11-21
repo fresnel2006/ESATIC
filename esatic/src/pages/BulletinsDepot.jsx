@@ -9,7 +9,7 @@ import { useToast } from '../context/ToastContext.jsx'
 import { Confirm, Empty, ErrorBox, Loader, Modal, Notice, PageHead, ResponsiveTable, Stat, StatusBadge, useAsync, ICON } from '../components/ui.jsx'
 import { fmtDateTime } from '../lib/format.js'
 import { BULLETIN_ACCEPT, checkBulletinFile, downloadBulletin, fmtSize, openBulletin, sendBulletin } from '../lib/bulletinFiles.js'
-import { LEVELS, LEVEL_NAMES } from '../api/seed.js'
+import { LEVELS, LEVEL_NAMES } from '../api/constants.js'
 
 
 // Fichier du dépôt groupé -> étudiant dont le matricule figure dans le nom du fichier

@@ -6,7 +6,7 @@ import * as api from '../../api/index.js'
 import { useToast } from '../../context/ToastContext.jsx'
 import { Avatar, Empty, ErrorBox, Loader, Notice, PageHead, ResponsiveTable, useAsync, ICON } from '../../components/ui.jsx'
 import { AbsencesBrowser, fmtCourseDay, fmtHours } from '../../components/AbsenceWidgets.jsx'
-import { LEVEL_NAMES } from '../../api/seed.js'
+import { LEVEL_NAMES } from '../../api/constants.js'
 
 const STATUSES = [['present', 'Présent'], ['absent', 'Absent'], ['retard', 'Retard']]
 const hm = (s) => s.replace(':', ' h ')
@@ -23,7 +23,7 @@ const longDay = (d) => new Date(`${d}T12:00:00Z`).toLocaleDateString('fr-FR', { 
 function RollCall({ options, preset, onSaved }) {
   const toast = useToast()
   const first = options.classes[0]
-  const [f, setF] = useState(() => preset || { classeId: first?.id ?? '', matiereId: first?.matieres[0]?.id ?? '', date: options.today, slot: currentSlot() })
+  const [f, setF] = useState(() => preset || { classeId: first?.id ?? '', matiereId: first?.matieres[0]?.id ?? '', date: options.week.includes(options.today) ? options.today : options.week[options.week.length - 1], slot: currentSlot() })
   const [roster, setRoster] = useState(null)
   const [records, setRecords] = useState({})
   const [existing, setExisting] = useState(null)
@@ -65,7 +65,8 @@ function RollCall({ options, preset, onSaved }) {
   const notToday = f.date !== options.today
   const locked = (existing && !existing.mine) || (notToday && !existing)
   const days = options.week.includes(f.date) ? options.week : [...options.week, f.date].sort()
-  const chooseDay = (d) => set({ date: d, slot: weekday(d) === 6 && Number(f.slot) === 3 ? 1 : f.slot })
+  const chooseDay = (d) => set({ date: d })
+  const weekend = [0, 6].includes(weekday(options.today))
   return (
     <div className="stack">
       <div className="card">
@@ -85,7 +86,7 @@ function RollCall({ options, preset, onSaved }) {
           <div className="field">
             <label htmlFor="att-s">Créneau</label>
             <select id="att-s" className="select" value={f.slot} onChange={(e) => set({ slot: Number(e.target.value) })}>
-              {Object.entries(options.slots).filter(([k]) => !(weekday(f.date) === 6 && k === '3')).map(([k, [a, b]]) => <option key={k} value={k}>{k} : {hm(a)} - {hm(b)}{k === '3' ? ' (soir)' : ' (matin)'}</option>)}
+              {Object.entries(options.slots).map(([k, [a, b]]) => <option key={k} value={k}>{k} : {hm(a)} - {hm(b)}{k === '3' ? ' (soir)' : ' (matin)'}</option>)}
             </select>
           </div>
         </div>
@@ -103,8 +104,8 @@ function RollCall({ options, preset, onSaved }) {
       </div>
 
       <div className="att-when"><b>{longDay(f.date)}</b> · créneau {f.slot} ({hm(options.slots[f.slot][0])} - {hm(options.slots[f.slot][1])}, {Number(f.slot) === 3 ? 'soir' : 'matin'})</div>
-      {weekday(f.date) === 0 && <Notice kind="danger">Pas de cours le dimanche : choisissez un autre jour.</Notice>}
-      {notToday && !existing && weekday(f.date) !== 0 && roster && <Notice>L'appel se fait en classe, le jour du cours. Aucun appel n'a été fait pour ce créneau ce jour-là ; vous pouvez seulement corriger un appel déjà fait (voir « Mes appels »).</Notice>}
+      {weekend && <Notice>Pas d'appel le samedi ni le dimanche : l'appel se fait du lundi au vendredi. Vous pouvez consulter ou corriger les appels de la semaine.</Notice>}
+      {notToday && !existing && !weekend && roster && <Notice>L'appel se fait en classe, le jour du cours. Aucun appel n'a été fait pour ce créneau ce jour-là ; vous pouvez seulement corriger un appel déjà fait (voir « Mes appels »).</Notice>}
       {existing && (locked
         ? <Notice kind="danger">L'appel de ce créneau a déjà été fait par {existing.teacher} ({existing.matiere}). Choisissez un autre créneau.</Notice>
         : <Notice>Vous avez déjà fait l'appel de ce cours ({existing.matiere}). Vous pouvez le corriger puis l'enregistrer à nouveau.</Notice>)}
@@ -140,7 +141,7 @@ function RollCall({ options, preset, onSaved }) {
           </div>
           <div className="att-foot">
             <span className="small muted">{classe?.name} · {fmtCourseDay(f.date)} · créneau {f.slot} ({hm(options.slots[f.slot][0])} - {hm(options.slots[f.slot][1])})</span>
-            <button className="btn btn-primary" disabled={busy || locked || !f.matiereId || weekday(f.date) === 0} onClick={save}>{busy ? <Loader2 {...ICON} className="spin" /> : <Save {...ICON} />} {existing?.mine ? 'Enregistrer la correction' : 'Enregistrer l\'appel'}</button>
+            <button className="btn btn-primary" disabled={busy || locked || !f.matiereId} onClick={save}>{busy ? <Loader2 {...ICON} className="spin" /> : <Save {...ICON} />} {existing?.mine ? 'Enregistrer la correction' : 'Enregistrer l\'appel'}</button>
           </div>
         </div>
       )}

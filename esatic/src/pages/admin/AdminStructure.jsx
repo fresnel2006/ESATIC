@@ -5,7 +5,7 @@ import * as api from '../../api/index.js'
 import { useToast } from '../../context/ToastContext.jsx'
 import { Confirm, Empty, ErrorBox, Loader, Modal, Notice, PageHead, ResponsiveTable, StatusBadge, Tabs, useAsync, ICON } from '../../components/ui.jsx'
 import { fmtShort, TOOLS } from '../../lib/format.js'
-import { LEVELS, LEVEL_NAMES } from '../../api/seed.js'
+import { LEVELS, LEVEL_NAMES } from '../../api/constants.js'
 
 
 const TABS = [

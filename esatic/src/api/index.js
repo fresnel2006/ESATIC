@@ -3,10 +3,14 @@
 // et enregistre dans Firestore. Mode 'demo' : la même logique tourne dans le navigateur (core.js).
 // L'exécution du code des étudiants se fait toujours dans le navigateur, dans un Web Worker isolé.
 
-import * as core from './core.js'
 import { API_MODE } from '../config.js'
+import { ApiError } from './shared.js'
 
-export { ApiError, languagesOf, questionTool, generatePassword, checkPasswordStrength, institutionalEmail, maxPoints, EVENT_WEIGHTS, riskScore, mentionFor } from './core.js'
+export { ApiError, languagesOf, questionTool, generatePassword, maxPoints, EVENT_WEIGHTS, riskScore, mentionFor } from './shared.js'
+
+// Logique complète (core.js) : chargée seulement quand elle sert (mode démo, exécution du code dans le
+// navigateur, correction automatique), pour que la première page reste légère
+const loadCore = () => import('./core.js')
 
 const REMOTE = API_MODE !== 'demo'
 const TOKEN_KEY = 'esatic-token' // un onglet = un poste
@@ -25,22 +29,23 @@ async function call(name, args) {
       body: JSON.stringify({ args }),
     })
   } catch {
-    throw new core.ApiError('Serveur injoignable. Vérifiez votre connexion puis réessayez.', 'network', 0)
+    throw new ApiError('Serveur injoignable. Vérifiez votre connexion puis réessayez.', 'network', 0)
   }
   const body = await res.json().catch(() => null)
   // 502 à 504 : le site répond mais le serveur Node.js derrière lui est arrêté
   if (!body && res.status >= 502 && res.status <= 504) {
-    throw new core.ApiError('Le serveur de la plateforme ne répond pas. Lancez-le (dossier server, commande npm run dev) puis réessayez.', 'network', res.status)
+    throw new ApiError('Le serveur de la plateforme ne répond pas. Lancez-le (dossier server, commande npm run dev) puis réessayez.', 'network', res.status)
   }
-  if (!body) throw new core.ApiError(`Réponse invalide du serveur (${res.status}).`, 'server', res.status)
+  if (!body) throw new ApiError(`Réponse invalide du serveur (${res.status}).`, 'server', res.status)
   if (body.token === null) sessionStorage.removeItem(TOKEN_KEY)
   else if (body.token) sessionStorage.setItem(TOKEN_KEY, JSON.stringify(body.token))
-  if (body.error) throw new core.ApiError(body.error.message, body.error.code, body.error.status)
+  if (body.error) throw new ApiError(body.error.message, body.error.code, body.error.status)
   return body.result
 }
 
 const remote = (name) => (...args) => call(name, args)
-const pick = (name) => (REMOTE ? remote(name) : core[name])
+const local = (name) => async (...args) => (await loadCore())[name](...args)
+const pick = (name) => (REMOTE ? remote(name) : local(name))
 
 export const login = pick('login')
 export const testAccounts = pick('testAccounts')
@@ -147,15 +152,15 @@ export const studentBulletins = pick('studentBulletins')
 
 // Exécution du code : toujours dans le navigateur (Python, JavaScript, SQL, PHP, C de base).
 // Les autres langages reçoivent un message « exécution non disponible ».
-export const runCode = REMOTE ? (params) => core.executeCode(params) : core.runCode
+export const runCode = REMOTE ? async (params) => (await loadCore()).executeCode(params) : local('runCode')
 
 // Correction automatique : le serveur fournit les codes, le navigateur de l'enseignant les exécute, le serveur note
 const gradeApi = { autoGradeJobs: remote('autoGradeJobs'), applyAutoGrade: remote('applyAutoGrade') }
-export const autoGradeCopy = REMOTE ? (id) => core.autoGradeCopyWith(gradeApi, id) : core.autoGradeCopy
+export const autoGradeCopy = REMOTE ? async (id) => (await loadCore()).autoGradeCopyWith(gradeApi, id) : local('autoGradeCopy')
 export const autoGradeAll = REMOTE
-  ? (id, onProgress) => core.autoGradeAllWith({ autoGradeTargets: remote('autoGradeTargets'), autoGradeCopy, autoGradeDone: remote('autoGradeDone') }, id, onProgress)
-  : core.autoGradeAll
+  ? async (id, onProgress) => (await loadCore()).autoGradeAllWith({ autoGradeTargets: remote('autoGradeTargets'), autoGradeCopy, autoGradeDone: remote('autoGradeDone') }, id, onProgress)
+  : local('autoGradeAll')
 
 export const resetDemo = REMOTE
   ? async () => { await call('resetDemo', []); sessionStorage.removeItem(TOKEN_KEY) }
-  : core.resetDemo
+  : local('resetDemo')

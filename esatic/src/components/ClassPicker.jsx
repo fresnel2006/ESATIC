@@ -1,6 +1,6 @@
 // Choix d'une ou plusieurs classes (création d'épreuve) : cases à cocher rangées de la L1 au M2,
 // avec « toutes » pour cocher un niveau entier d'un coup.
-import { LEVELS, LEVEL_NAMES } from '../api/seed.js'
+import { LEVELS, LEVEL_NAMES } from '../api/constants.js'
 
 export default function ClassPicker({ classes, value = [], onChange, disabled = false }) {
   const levels = [...LEVELS, ...new Set(classes.map((c) => c.level || 'Autres').filter((l) => !LEVELS.includes(l)))]

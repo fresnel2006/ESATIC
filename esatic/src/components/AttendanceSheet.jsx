@@ -1,12 +1,13 @@
 // Cahier d'appels d'une classe pour une semaine, au format de la feuille papier de l'ESATIC :
-// N°, NOM, PRÉNOMS, STATUT, puis lundi au samedi (MATIN 1 et 2, SOIR 3). Absent : son numéro d'ordre dans la
+// N°, NOM, PRÉNOMS, STATUT, puis lundi au samedi (MATIN 1 et 2, SOIR 3). Pas d'appel le samedi : sa colonne,
+// présente sur le modèle officiel, reste vide. Absent : son numéro d'ordre dans la
 // case ; présent : un point ; retard : « R ». En bas : matière et enseignant de chaque créneau, visa.
 import { Fragment, useState } from 'react'
 import { ChevronLeft, ChevronRight, Printer, Stamp, Undo2 } from 'lucide-react'
 import * as api from '../api/index.js'
 import { useToast } from '../context/ToastContext.jsx'
 import { ErrorBox, Loader, useAsync } from './ui.jsx'
-import { LEVEL_NAMES } from '../api/seed.js'
+import { LEVEL_NAMES } from '../api/constants.js'
 import { fmtDateTime } from '../lib/format.js'
 
 const DAY_NAMES = ['LUNDI', 'MARDI', 'MERCREDI', 'JEUDI', 'VENDREDI', 'SAMEDI']

@@ -4,7 +4,7 @@ import { Hash, Lock, GraduationCap, Eye, EyeOff, Loader2, FlaskConical } from 'l
 import { useAuth } from '../context/AuthContext.jsx'
 import Logo from '../components/Logo.jsx'
 import { Modal, Notice, ICON } from '../components/ui.jsx'
-import { DEMO_ACCOUNTS } from '../api/seed.js'
+import { DEMO_ACCOUNTS } from '../api/constants.js'
 import { DEMO_TOOLS, TEST_MODE } from '../config.js'
 import * as api from '../api/index.js'
 import { ROLE_HOME } from '../lib/format.js'

@@ -6,7 +6,7 @@ import { ArrowLeft, CalendarX2, CheckCircle2, ChevronRight, Clock, Download, Und
 import * as api from '../api/index.js'
 import { useToast } from '../context/ToastContext.jsx'
 import { Avatar, Empty, ErrorBox, Loader, ResponsiveTable, Stat, useAsync } from './ui.jsx'
-import { LEVELS, LEVEL_NAMES } from '../api/seed.js'
+import { LEVELS, LEVEL_NAMES } from '../api/constants.js'
 import { downloadCsv } from '../lib/format.js'
 import AttendanceSheet from './AttendanceSheet.jsx'
 import { JustificationCard } from './JustificationWidgets.jsx'

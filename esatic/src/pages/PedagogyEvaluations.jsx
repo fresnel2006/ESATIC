@@ -9,7 +9,7 @@ import { useToast } from '../context/ToastContext.jsx'
 import { Avatar, Empty, ErrorBox, Loader, Modal, Notice, PageHead, ResponsiveTable, Stat, StatusBadge, useAsync, ICON } from '../components/ui.jsx'
 import { EVAL_TYPE_LABELS, EvalResultCard, QcmResult, ScoreBadge, ScoreBar, fmt5 } from '../components/EvalWidgets.jsx'
 import { fmtDateTime, fromLocalInput, toLocalInput } from '../lib/format.js'
-import { LEVELS, LEVEL_NAMES } from '../api/seed.js'
+import { LEVELS, LEVEL_NAMES } from '../api/constants.js'
 
 // Modèle proposé par défaut : la direction pédagogique modifie, retire ou ajoute parties et questions
 const note = (label) => ({ type: 'note', label })

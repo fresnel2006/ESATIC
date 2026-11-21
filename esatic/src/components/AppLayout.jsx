@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { Suspense, useEffect, useRef, useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import {
   ArrowUpRight, ArrowDownRight, Search, Bell, ChevronsLeft, ChevronsRight,
@@ -7,7 +7,7 @@ import {
 import { useAuth } from '../context/AuthContext.jsx'
 import { NAV } from './nav.js'
 import Logo from './Logo.jsx'
-import { Avatar, ICON } from './ui.jsx'
+import { Avatar, ICON, Loader } from './ui.jsx'
 import { ROLE_LABELS, fmtAgo } from '../lib/format.js'
 import * as api from '../api/index.js'
 
@@ -272,7 +272,7 @@ export default function AppLayout() {
           <AccountMenu user={user} theme={theme} toggleTheme={toggleTheme} compact />
         </header>
         <main className="content" id="contenu">
-          <div key={location.pathname} className="page-enter"><Outlet /></div>
+          <div key={location.pathname} className="page-enter"><Suspense fallback={<Loader variant="table" />}><Outlet /></Suspense></div>
         </main>
       </div>
 
