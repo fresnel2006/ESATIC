@@ -9,6 +9,7 @@ import { Avatar, Empty, ErrorBox, Loader, ResponsiveTable, Stat, useAsync } from
 import { LEVELS, LEVEL_NAMES } from '../api/seed.js'
 import { downloadCsv } from '../lib/format.js'
 import AttendanceSheet from './AttendanceSheet.jsx'
+import { JustificationCard } from './JustificationWidgets.jsx'
 
 // 3.5 -> « 3 h 30 » ; 2 -> « 2 h »
 export function fmtHours(h) {
@@ -81,8 +82,8 @@ function StudentDetail({ studentId, onBack }) {
                   <span>{it.matiere}</span>
                   <span className="small muted">{it.teacher}{it.reason ? ` · Motif : ${it.reason}` : ''}</span>
                 </div>
-                <StatusTag status={it.status} justified={it.justified} />
-                {data.canJustify && it.status === 'absent' && (
+                {it.pending ? <span className="abs-tag pending">Justificatif en vérification</span> : <StatusTag status={it.status} justified={it.justified} />}
+                {data.canJustify && it.status === 'absent' && !it.pending && (
                   editing === it.attendanceId ? (
                     <div className="abs-justify">
                       <input className="input" autoFocus placeholder="Motif (certificat médical, convocation...)" value={reason} maxLength={200} onChange={(e) => setReason(e.target.value)} />
@@ -98,6 +99,12 @@ function StudentDetail({ studentId, onBack }) {
           </div>
         )}
       </div>
+      {data.requests?.length > 0 && (
+        <div className="stack-sm">
+          <h2 className="eval-section-title">Justificatifs envoyés par l'étudiant</h2>
+          {data.requests.map((j) => <JustificationCard key={j.id} j={j} showStudent={false} canReview={data.canJustify} onDone={reload} />)}
+        </div>
+      )}
     </section>
   )
 }

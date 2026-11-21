@@ -12,6 +12,17 @@ import { fmtDateTime } from '../lib/format.js'
 const DAY_NAMES = ['LUNDI', 'MARDI', 'MERCREDI', 'JEUDI', 'VENDREDI', 'SAMEDI']
 const short = (d) => { const [y, m, j] = d.split('-'); return `${j}/${m}/${y}` }
 const hm = (s) => s.replace(':', ' h ')
+const ORD = (n) => (n === 1 ? '1ère' : `${n}ème`)
+// « LICENCE, 3ème année », « MASTER, 1ère année », « CLASSE PRÉPARATOIRE, 2ème année »
+function gradeLabel(level) {
+  const m = /^([LM])(\d)$/.exec(level || '')
+  if (m) return `${m[1] === 'L' ? 'LICENCE' : 'MASTER'}, ${ORD(Number(m[2]))} année`
+  const p = /^Prépa (\d)$/.exec(level || '')
+  if (p) return `CLASSE PRÉPARATOIRE, ${ORD(Number(p[1]))} année`
+  return LEVEL_NAMES[level] || level || ''
+}
+// Groupe : la lettre de la classe (SRIT 2 A -> A)
+const groupOf = (name) => { const m = /\s([A-Z])$/.exec(name || ''); return m ? m[1] : '' }
 
 export default function AttendanceSheet({ classeId }) {
   const toast = useToast()
@@ -30,7 +41,7 @@ export default function AttendanceSheet({ classeId }) {
     if (!s.done) return ''
     if (v === 'absent') return <span className={`sheet-abs ${s.justified.includes(String(st.id)) ? 'just' : ''}`} title={s.justified.includes(String(st.id)) ? 'Absence justifiée' : 'Absent'}>{st.n}</span>
     if (v === 'retard') return <span className="sheet-ret" title="Retard">R</span>
-    return <span className="sheet-dot">·</span>
+    return ''
   }
 
   return (
@@ -45,21 +56,28 @@ export default function AttendanceSheet({ classeId }) {
           {data.canVisa && (data.visa
             ? <button className="btn btn-ghost btn-sm" onClick={() => visa(false)}><Undo2 size={14} /> Retirer le visa</button>
             : <button className="btn btn-primary btn-sm" onClick={() => visa(true)}><Stamp size={15} /> Viser la feuille</button>)}
-          <button className="btn btn-secondary btn-sm" onClick={() => window.print()}><Printer size={15} /> Imprimer</button>
+          <button className="btn btn-secondary btn-sm" onClick={() => window.print()}><Printer size={15} /> Imprimer ou enregistrer en PDF</button>
         </div>
       </div>
 
       <div className="card sheet print-area">
         <div className="sheet-head">
           <img src="/img/logo-esatic.svg" alt="ESATIC" className="sheet-logo" />
-          <div className="sheet-title">
-            <strong>CAHIER D'APPELS</strong>
-            <span>Semaine du {short(data.monday)} au {short(data.saturday)}</span>
+          <div className="sheet-title"><strong>CAHIER D'APPELS</strong></div>
+          <div className="sheet-code">
+            <span>Code : EN/PR1/08</span>
+            <span>Version : 03</span>
+            <span>Crée-le : 29/01/2021</span>
+            <span>Modifié le : 12/05/2022</span>
+            <span>Page : 1 / 1</span>
           </div>
+        </div>
+        <div className="sheet-sub">
+          <span className="sheet-week">Semaine du <b>{short(data.monday)}</b> au <b>{short(data.saturday)}</b></span>
           <div className="sheet-meta">
-            <span><b>Grade et Niveau :</b> {LEVEL_NAMES[data.classe.level] || data.classe.level}</span>
+            <span><b>Grade et Niveau :</b> {gradeLabel(data.classe.level)}</span>
             <span><b>Filière :</b> {data.classe.filiere}</span>
-            <span><b>Classe :</b> {data.classe.name}</span>
+            <span><b>Groupe :</b> {groupOf(data.classe.name) || '..........'} <span className="muted no-print-hide">({data.classe.name})</span></span>
           </div>
         </div>
         <div className="sheet-scroll">
@@ -70,7 +88,7 @@ export default function AttendanceSheet({ classeId }) {
                 <th rowSpan={3} className="c-nom">NOM</th>
                 <th rowSpan={3} className="c-prenom">PRÉNOMS</th>
                 <th rowSpan={3} className="c-sta">STA<br />TUT</th>
-                {data.days.map((d, i) => <th key={d.date} colSpan={d.slots.length} className="c-day">{DAY_NAMES[i]}<span>{short(d.date).slice(0, 5)}</span></th>)}
+                {data.days.map((d, i) => <th key={d.date} colSpan={d.slots.length} className="c-day">{DAY_NAMES[i]}</th>)}
               </tr>
               <tr>
                 {data.days.map((d) => (
@@ -106,9 +124,11 @@ export default function AttendanceSheet({ classeId }) {
           </table>
         </div>
         <div className="sheet-notes">
-          <p>En cas d'absence de l'étudiant(e), son numéro d'ordre est inscrit dans la case correspondante ; un point indique la présence ; « R » un retard. Numéro en vert : absence justifiée.</p>
-          <p><b>NB :</b> 1 = {hm(data.slots[1][0])} - {hm(data.slots[1][1])} ; 2 = {hm(data.slots[2][0])} - {hm(data.slots[2][1])} et 3 = {hm(data.slots[3][0])} - {hm(data.slots[3][1])}</p>
-          <p><i>Pour Statut : N = Nouveau dans la classe ; R = Redouble la classe ; ou A = Autorisé à s'inscrire dans la classe.</i></p>
+          <p>En cas d'absence de l'étudiant(e), veuillez inscrire en regard de son nom, son numéro d'ordre dans la case correspondante. Si non, ne rien écrire en cas de présence de l'étudiant(e).</p>
+          <p className="sheet-nb"><b>NB : 1 = {hm(data.slots[1][0]).replace(/^0/, '')} - {hm(data.slots[1][1])} ; 2 = {hm(data.slots[2][0])} - {hm(data.slots[2][1])} et 3 = {hm(data.slots[3][0])} - {hm(data.slots[3][1])}</b></p>
+          <p><b><i>Pour Statut : N = Nouveau dans la classe ; R = Redouble la classe ; ou A = Autorisé à s'inscrire dans la classe (dans ce cas, l'étudiant est aussi inscrit dans la classe précédente comme Redoublant).</i></b></p>
+          <p className="sheet-smq">SMQ/ESATIC/PR1 : Assurer la sélection et la gestion des apprenants</p>
+          <p className="sheet-legend no-print">Sur la plateforme : « R » = retard ; numéro en vert = absence justifiée.</p>
         </div>
       </div>
     </div>

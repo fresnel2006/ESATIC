@@ -168,7 +168,7 @@ const READ_FIRST = new Set([
   'listAnnouncements', 'search', 'bulletinOptions', 'listBulletins', 'getBulletinFile', 'studentBulletins',
   'listEvalCampaigns', 'evalResults', 'myEvalResults', 'studentEvaluations', 'submitEvaluation', 'evalAvailable',
   'studentHome', 'listTimetables', 'myTimetables', 'getTimetableFile',
-  'attendanceOptions', 'getAttendance', 'myAttendanceSessions', 'absenceOverview', 'absenceSummary', 'studentAbsences', 'myAbsences', 'attendanceWeek',
+  'attendanceOptions', 'getAttendance', 'myAttendanceSessions', 'absenceOverview', 'absenceSummary', 'studentAbsences', 'myAbsences', 'attendanceWeek', 'listJustifications', 'getJustificationFile',
 ])
 
 const chunks = (list, n = 30) => Array.from({ length: Math.ceil(list.length / n) }, (_, i) => list.slice(i * n, i * n + n))

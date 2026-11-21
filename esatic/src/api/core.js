@@ -2916,8 +2916,9 @@ export async function absenceSummary(classeId) {
   })
 }
 
-function absenceItems(docs, studentId) {
+function absenceItems(docs, studentId, pendingIds = new Set()) {
   return docs.filter((d) => ['absent', 'retard'].includes(d.records?.[studentId])).sort(attendanceOrder).map((d) => ({
+    pending: !d.justified?.[studentId] && pendingIds.has(d.id),
     attendanceId: d.id, date: d.date, start: d.start, end: d.end, hours: d.hours, matiere: matiereName(d.matiereId), teacher: fullName(d.teacherId),
     status: d.records[studentId], justified: !!d.justified?.[studentId], reason: d.justified?.[studentId]?.reason || '',
   }))
@@ -2931,7 +2932,13 @@ export async function studentAbsences(studentId) {
   if (!s) throw new ApiError('Étudiant introuvable.', 'not_found', 404)
   if (user.role === 'teacher') assertTeaches(user, s.classeId)
   const docs = await platform.store.query('attendance', { classeId: s.classeId })
-  return clone({ student: publicUser(s), classe: className(s.classeId), totals: absenceTotalsFor(docs, s.id), items: absenceItems(docs, s.id), canJustify: ABSENCE_STAFF.includes(user.role) })
+  const requests = await platform.store.query('justifications', { studentId: s.id })
+  const pendingIds = new Set(requests.filter((j) => j.status === 'en_attente').flatMap((j) => j.items))
+  return clone({
+    student: publicUser(s), classe: className(s.classeId), totals: absenceTotalsFor(docs, s.id), items: absenceItems(docs, s.id, pendingIds),
+    requests: requests.map((j) => justificationInfo(j, docs)).sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
+    canJustify: ABSENCE_STAFF.includes(user.role),
+  })
 }
 
 // PUT /api/absences/justify { attendanceId, studentId, justified, reason } (direction pédagogique, éducateurs, administration)
@@ -2977,13 +2984,22 @@ export async function attendanceWeek(classeId, date) {
   const visa = await platform.store.get('attendanceVisa', `${cid}_${monday}`)
   const filiere = db.filieres.find((f) => f.id === classe.filiereId)
   return clone({
-    classe: { id: classe.id, name: classe.name, level: classe.level, filiere: filiere?.name || filiere?.code || '' },
+    classe: { id: classe.id, name: classe.name, level: classe.level, filiere: filiereLabel(filiere) },
     monday, saturday, previous: addDays(monday, -7), next: addDays(monday, 7),
     roster: roster.map((s, i) => ({ id: s.id, n: i + 1, lastName: s.lastName, firstName: s.firstName, statut: s.statut || 'N' })),
     days, slots: ATTENDANCE_SLOTS,
     visa: visa?.by ? { by: fullName(visa.by), at: visa.at } : null,
     canVisa: ABSENCE_STAFF.includes(user.role),
   })
+}
+
+// Filière telle qu'écrite sur le cahier d'appels : code puis nom complet (« TWIN Technologies du Web et Images
+// Numériques »). Le nom complet se règle dans Structure > Filières ; à défaut, ceux connus de la feuille papier.
+const FILIERE_FULL = { TWIN: 'Technologies du Web et Images Numériques' }
+function filiereLabel(f) {
+  if (!f) return ''
+  const name = f.name && f.name !== f.code ? f.name : FILIERE_FULL[f.code]
+  return name ? `${f.code} ${name}` : f.code
 }
 
 // PUT /api/attendance/week/visa { classeId, semaine, visa } : visa de l'administration sur la feuille de la semaine
@@ -3004,7 +3020,138 @@ export async function myAbsences() {
   await load()
   const user = requireUser('student')
   const docs = await platform.store.query('attendance', { classeId: user.classeId })
-  return clone({ totals: absenceTotalsFor(docs, user.id), items: absenceItems(docs, user.id) })
+  const requests = await platform.store.query('justifications', { studentId: user.id })
+  const pendingIds = new Set(requests.filter((j) => j.status === 'en_attente').flatMap((j) => j.items))
+  return clone({
+    totals: absenceTotalsFor(docs, user.id), items: absenceItems(docs, user.id, pendingIds),
+    requests: requests.map((j) => justificationInfo(j, docs)).sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
+    motifs: JUSTIFICATION_MOTIFS,
+  })
+}
+
+// ---------------------------------------------------------------------------
+// Billets de justification
+// L'étudiant envoie un justificatif (photo ou PDF du billet) pour une ou plusieurs de ses absences. Les
+// éducateurs (ou la direction pédagogique, l'administration) l'ouvrent, vérifient qu'il est valable, puis le
+// valident (les heures deviennent justifiées) ou le refusent avec un motif. L'étudiant est prévenu.
+// Rangement à part (collection justifications) ; le fichier va avec les autres fichiers déposés.
+// ---------------------------------------------------------------------------
+
+export const JUSTIFICATION_MOTIFS = ['Maladie (certificat médical)', 'Événement familial', 'Convocation administrative ou officielle', 'Activité de l\'école', 'Autre']
+const JUSTIF_MAX_BYTES = 3 * 1024 * 1024
+const JUSTIF_TYPES = BULLETIN_TYPES // PDF, JPG, PNG
+
+function justificationInfo(j, docs = []) {
+  const s = db.users.find((u) => u.id === j.studentId)
+  const items = j.items.map((id) => {
+    const d = docs.find((x) => x.id === id)
+    return d ? { attendanceId: id, date: d.date, start: d.start, end: d.end, hours: d.hours, matiere: matiereName(d.matiereId), teacher: fullName(d.teacherId) } : { attendanceId: id, missing: true }
+  })
+  return {
+    id: j.id, studentId: j.studentId, student: s ? `${s.lastName} ${s.firstName}` : '', matricule: s?.matricule || '', classe: className(j.classeId), classeId: j.classeId,
+    motif: j.motif, comment: j.comment || '', fileName: j.fileName, mime: j.mime, size: j.size,
+    status: j.status, reviewNote: j.reviewNote || '', reviewedBy: j.reviewedBy ? fullName(j.reviewedBy) : '', reviewedAt: j.reviewedAt || null,
+    createdAt: j.createdAt, items, hours: round2(items.reduce((n, it) => n + (it.hours || 0), 0)),
+  }
+}
+
+// POST /api/student/justifications { attendanceIds, motif, comment, file: { name, base64 } }
+export async function submitJustification(input = {}) {
+  await load()
+  const user = requireUser('student')
+  const ids = [...new Set((input.attendanceIds || []).map(String))]
+  if (!ids.length) throw new ApiError('Choisissez la ou les absences concernées.')
+  if (ids.length > 30) throw new ApiError('30 absences au maximum par justificatif.')
+  const motif = String(input.motif || '')
+  if (!JUSTIFICATION_MOTIFS.includes(motif)) throw new ApiError('Choisissez le motif de l\'absence.')
+  const comment = String(input.comment || '').trim().slice(0, 500)
+  if (motif === 'Autre' && !comment) throw new ApiError('Précisez le motif dans le commentaire.')
+  // Les absences : de sa classe, notées « absent », pas encore justifiées ni déjà en attente de vérification
+  const docs = await platform.store.query('attendance', { classeId: user.classeId })
+  const pending = (await platform.store.query('justifications', { studentId: user.id })).filter((j) => j.status === 'en_attente')
+  for (const id of ids) {
+    const d = docs.find((x) => x.id === id)
+    if (!d || d.records?.[user.id] !== 'absent') throw new ApiError('Une des absences choisies est introuvable.')
+    if (d.justified?.[user.id]) throw new ApiError(`L'absence du ${fmtDayFr(d.date)} est déjà justifiée.`)
+    if (pending.some((j) => j.items.includes(id))) throw new ApiError(`Un justificatif pour l'absence du ${fmtDayFr(d.date)} est déjà en cours de vérification.`)
+  }
+  let bytes
+  try { bytes = decodeBase64(input.file?.base64) } catch { throw new ApiError('Fichier illisible.') }
+  if (!bytes.length) throw new ApiError('Joignez une photo ou un PDF du billet de justification.')
+  if (bytes.length > JUSTIF_MAX_BYTES) throw new ApiError(`Fichier trop lourd (${(bytes.length / 1048576).toFixed(1)} Mo) : 3 Mo au maximum. Prenez la photo en qualité normale.`)
+  const type = JUSTIF_TYPES.find((t) => t.magic.every((x, i) => bytes[i] === x))
+  if (!type) throw new ApiError('Format non accepté : photo (JPG, PNG) ou PDF.')
+  const key = await fileKey(bytes)
+  await platform.files.put(key, bytes)
+  const id = `${user.id}_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`
+  const j = {
+    id, schoolId: user.schoolId ?? 1, studentId: user.id, classeId: user.classeId, items: ids, motif, comment,
+    fileKey: key, fileName: String(input.file?.name || `justificatif.${type.ext}`).replace(/[\\/:*?"<>|]+/g, '_').slice(0, 120), mime: type.mime, size: bytes.length,
+    status: 'en_attente', createdAt: now(),
+  }
+  await platform.store.put('justifications', id, j)
+  // Les éducateurs sont prévenus qu'un billet attend leur vérification
+  for (const u of db.users.filter((x) => x.role === 'educator' && x.active)) {
+    notify(u.id, 'Justificatif à vérifier', `${user.lastName} ${user.firstName} (${className(user.classeId)}) : ${ids.length} absence(s), ${motif}.`, '/educateur/absences?onglet=justificatifs')
+  }
+  audit(user, 'depot_justificatif', `${user.lastName} ${user.firstName} (${user.matricule})`, `${ids.length} absence(s) - ${motif}`)
+  return clone(justificationInfo(j, docs))
+}
+
+// GET /api/justifications?statut= (éducateurs, direction pédagogique, administration)
+export async function listJustifications(status = 'en_attente') {
+  await load()
+  requireUser(...ABSENCE_STAFF)
+  const list = await platform.store.query('justifications', { status: ['en_attente', 'acceptee', 'refusee'].includes(status) ? status : 'en_attente' })
+  // Appels des classes concernées, pour afficher la date et la matière de chaque absence
+  const classes = [...new Set(list.map((j) => j.classeId))]
+  const docs = (await Promise.all(classes.map((c) => platform.store.query('attendance', { classeId: c })))).flat()
+  const pendingCount = status === 'en_attente' ? list.length : await platform.store.count('justifications', { status: 'en_attente' })
+  return clone({
+    items: list.map((j) => justificationInfo(j, docs)).sort((a, b) => (status === 'en_attente' ? a.createdAt.localeCompare(b.createdAt) : (b.reviewedAt || '').localeCompare(a.reviewedAt || ''))).slice(0, 200),
+    pendingCount,
+  })
+}
+
+// Fichier du billet : l'équipe pédagogique, ou l'étudiant qui l'a envoyé
+export async function getJustificationFile(id) {
+  await load()
+  const user = requireUser(...ABSENCE_STAFF, 'student')
+  const j = await platform.store.get('justifications', String(id))
+  if (!j || (user.role === 'student' && j.studentId !== user.id)) throw new ApiError('Justificatif introuvable.', 'not_found', 404)
+  const bytes = await platform.files.get(j.fileKey)
+  if (!bytes) throw new ApiError('Le fichier de ce justificatif est introuvable.', 'not_found', 404)
+  let bin = ''
+  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000))
+  return { fileName: j.fileName, mime: j.mime, base64: btoa(bin) }
+}
+
+// PUT /api/justifications/{id} { accept, note } : validation (heures justifiées) ou refus (motif obligatoire)
+export async function reviewJustification(id, accept, note = '') {
+  await load()
+  const actor = requireUser(...ABSENCE_STAFF)
+  const j = await platform.store.get('justifications', String(id))
+  if (!j) throw new ApiError('Justificatif introuvable.', 'not_found', 404)
+  if (j.status !== 'en_attente') throw new ApiError('Ce justificatif a déjà été traité.')
+  const text = String(note || '').trim().slice(0, 300)
+  if (!accept && !text) throw new ApiError('Indiquez pourquoi le justificatif est refusé (illisible, non signé, dates différentes...).')
+  const s = db.users.find((u) => u.id === j.studentId)
+  if (accept) {
+    for (const aid of j.items) {
+      const d = await platform.store.get('attendance', aid)
+      if (!d || d.records?.[j.studentId] !== 'absent') continue
+      d.justified ||= {}
+      d.justified[j.studentId] = { by: actor.id, at: now(), reason: j.motif + (j.comment ? ` - ${j.comment}` : ''), justificationId: j.id }
+      d.updatedAt = now()
+      await platform.store.put('attendance', d.id, d)
+    }
+  }
+  Object.assign(j, { status: accept ? 'acceptee' : 'refusee', reviewedBy: actor.id, reviewedAt: now(), reviewNote: text })
+  await platform.store.put('justifications', j.id, j)
+  notify(j.studentId, accept ? 'Justificatif accepté' : 'Justificatif refusé',
+    accept ? `Vos ${j.items.length} absence(s) sont justifiées (${j.motif}).` : `Motif : ${text}. Vous pouvez envoyer un nouveau justificatif.`, '/etudiant/absences')
+  audit(actor, accept ? 'validation_justificatif' : 'refus_justificatif', s ? `${s.lastName} ${s.firstName} (${s.matricule})` : '', `${j.items.length} absence(s) - ${j.motif}${text ? ` - ${text}` : ''}`)
+  return { ok: true }
 }
 
 // Remise à zéro de la démo (bouton dans les paramètres)

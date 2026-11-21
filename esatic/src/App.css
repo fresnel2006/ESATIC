@@ -1196,11 +1196,17 @@ h2, h3 { font-weight: 600; }
 /* Cahier d'appels (format de la feuille papier de l'ESATIC) */
 .sheet-tools { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
 .sheet { padding: 18px; }
-.sheet-head { display: grid; grid-template-columns: auto 1fr auto; gap: 18px; align-items: center; padding-bottom: 12px; margin-bottom: 12px; border-bottom: 2px solid #1b1b1b; }
+.sheet-head { display: grid; grid-template-columns: auto 1fr auto; gap: 18px; align-items: center; padding-bottom: 8px; }
+.sheet-code { display: flex; flex-direction: column; font-size: 0.72rem; border: 1px solid #1b1b1b; padding: 4px 8px; line-height: 1.35; }
+.sheet-sub { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; margin-bottom: 8px; flex-wrap: wrap; }
+.sheet-week { font-size: 0.86rem; font-weight: 600; }
+.sheet-nb { margin-top: 2px !important; }
+.sheet-smq { text-align: center; margin-top: 4px !important; }
+.sheet-legend { color: var(--text-3); margin-top: 6px !important; }
 .sheet-logo { height: 44px; width: auto; }
 .sheet-title { display: flex; flex-direction: column; align-items: center; gap: 4px; }
-.sheet-title strong { font-size: 1.15rem; letter-spacing: 0.06em; }
-.sheet-meta { display: flex; flex-direction: column; gap: 2px; font-size: 0.82rem; text-align: right; }
+.sheet-title strong { font-size: 1.2rem; letter-spacing: 0.08em; font-weight: 800; }
+.sheet-meta { display: flex; flex-direction: column; gap: 2px; font-size: 0.82rem; }
 .sheet-scroll { overflow-x: auto; }
 .sheet-table { border-collapse: collapse; width: 100%; font-size: 0.78rem; color: #1b1b1b; background: #fff; }
 .sheet-table th, .sheet-table td { border: 1px solid #555; padding: 3px 4px; text-align: center; }
@@ -1228,11 +1234,45 @@ h2, h3 { font-weight: 600; }
 .sheet-notes p { margin: 0; }
 
 @media print {
-  @page { size: A4 landscape; margin: 8mm; }
+  @page { size: A4 portrait; margin: 7mm; }
+  .no-print-hide { display: none !important; }
+  html, body, #root, .app, .main, .content { background: #fff !important; }
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+  .sheet-table tr { opacity: 1 !important; transform: none !important; }
+  .print-area { border-radius: 0 !important; background: #fff !important; }
+  .sheet-table td, .sheet-table tbody tr:nth-child(even) td, .sheet-table .c-cell.done { background: #fff !important; }
+  .sheet-table th { background: #fff !important; }
+  .sheet-table th, .sheet-table td { border: 0.6pt solid #000 !important; }
+  .sheet-table .c-sign { height: 60px; }
+  .sheet-table .c-cell { height: 18px; min-width: 0; }
+  .sheet-table th, .sheet-table td { padding: 1px 2px; }
   body * { visibility: hidden !important; }
   .print-area, .print-area * { visibility: visible !important; }
   .print-area { position: absolute; left: 0; top: 0; width: 100%; border: 0 !important; box-shadow: none !important; padding: 0 !important; }
   .sheet-scroll { overflow: visible; }
-  .sheet-table { font-size: 9px; }
+  .sheet-table { font-size: 7.5px; }
+  .sheet-notes { font-size: 7.5px; }
+  .sheet-code, .sheet-meta, .sheet-week { font-size: 8px; }
+  .sheet-logo { height: 34px; }
   .no-print { display: none !important; }
 }
+
+
+/* Billets de justification */
+.abs-tag.pending { background: #e6effa; color: #0b4f9c; }
+.abs-item.selectable { cursor: pointer; }
+.abs-item.selectable:hover { background: var(--surface-2); }
+.tab-count { display: inline-block; min-width: 20px; padding: 0 6px; margin-left: 6px; border-radius: 999px; background: #d93025; color: #fff; font-size: 0.75rem; font-weight: 700; line-height: 20px; text-align: center; }
+.justif-card { padding: 16px 20px; display: flex; flex-direction: column; gap: 10px; border-left: 4px solid #0b4f9c; }
+.justif-card.acceptee { border-left-color: #1e8e4e; }
+.justif-card.refusee { border-left-color: #d93025; }
+.justif-head { display: flex; justify-content: space-between; gap: 14px; flex-wrap: wrap; }
+.justif-student { display: block; font-size: 1rem; margin-bottom: 4px; }
+.justif-motif { display: flex; align-items: center; gap: 6px; font-weight: 500; margin-bottom: 2px; }
+.justif-side { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+.justif-hours { font-size: 1.15rem; font-weight: 700; }
+.justif-items { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 3px; font-size: 0.9rem; }
+.justif-review { margin: 0; color: var(--text-2); }
+.justif-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.justif-refuse { display: flex; gap: 8px; flex: 1; flex-wrap: wrap; }
+.justif-refuse .input { flex: 1; min-width: 240px; }
