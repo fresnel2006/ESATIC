@@ -7,6 +7,7 @@ import { useAuth } from '../../context/AuthContext.jsx'
 import { Avatar, Empty, ErrorBox, Loader, Modal, Notice, PageHead, ResponsiveTable, StatusBadge, useAsync, ICON } from '../../components/ui.jsx'
 import { ROLE_LABELS, downloadCsv, fmtDateTime, parseCsv } from '../../lib/format.js'
 import TeacherAssignments from '../../components/TeacherAssignments.jsx'
+import ClassPicker from '../../components/ClassPicker.jsx'
 
 function UserForm({ user, structure, onClose, onSaved }) {
   const { classes } = structure
@@ -47,7 +48,7 @@ function UserForm({ user, structure, onClose, onSaved }) {
   }
 
   return (
-    <Modal wide={f.role === 'teacher'} title={user ? 'Modifier l\'utilisateur' : 'Nouvel utilisateur'} onClose={onClose} footer={<>
+    <Modal wide={f.role === 'teacher' || f.role === 'educator'} title={user ? 'Modifier l\'utilisateur' : 'Nouvel utilisateur'} onClose={onClose} footer={<>
       <button className="btn btn-secondary" onClick={onClose}>Annuler</button>
       <button className="btn btn-primary" disabled={busy} onClick={save}>{user ? 'Enregistrer' : 'Créer le compte'}</button>
     </>}>
@@ -72,6 +73,21 @@ function UserForm({ user, structure, onClose, onSaved }) {
             <select id="u-cl" className="select" value={f.classeId ?? ''} onChange={(e) => set({ classeId: Number(e.target.value) })}>
               {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
+          </div>
+        )}
+        {f.role === 'teacher' && (
+          <div className="field span-2">
+            <label className="checkbox">
+              <input type="checkbox" checked={(f.extraRoles || []).includes('educator')} onChange={(e) => set({ extraRoles: e.target.checked ? ['educator'] : [] })} />
+              Aussi éducateur <span className="muted small">(à la connexion, il choisit l'espace enseignant ou éducateur)</span>
+            </label>
+          </div>
+        )}
+        {(f.role === 'educator' || (f.role === 'teacher' && (f.extraRoles || []).includes('educator'))) && (
+          <div className="field span-2">
+            <label>Classes suivies comme éducateur</label>
+            <span className="hint">Ses classes apparaissent en premier dans les absences ; les justificatifs de ces classes lui sont signalés. L'éducateur peut aussi les choisir lui-même.</span>
+            <ClassPicker classes={classes} value={f.supervisedClasseIds || []} onChange={(ids) => set({ supervisedClasseIds: ids })} />
           </div>
         )}
         {f.role === 'teacher' && (
@@ -307,7 +323,7 @@ export default function AdminUsers() {
                 </span>
               ) },
               { key: 'matricule', label: 'Matricule', render: (u) => <span className="mono nowrap">{u.matricule}</span> },
-              { key: 'role', label: 'Rôle', render: (u) => ROLE_LABELS[u.role] },
+              { key: 'role', label: 'Rôle', render: (u) => (u.roles?.length > 1 ? u.roles.map((r) => ROLE_LABELS[r]).join(' · ') : ROLE_LABELS[u.role]) },
               { key: 'classe', label: 'Classe', render: (u) => {
                 if (u.role === 'teacher') {
                   const names = [...new Set((structure.teaching || []).filter((t) => t.teacherId === u.id).map((t) => structure.classes.find((c) => c.id === t.classeId)?.name).filter(Boolean))]

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, Clock, ListChecks, Maximize, ClipboardX, ShieldCheck, Loader2, MonitorSmartphone, FileCode2, TriangleAlert } from 'lucide-react'
 import * as api from '../../api/index.js'
+import { inSafeExamBrowser } from '../../lib/sebConfig.js'
 import { ErrorBox, Loader, Notice, StatusBadge, useAsync, ICON } from '../../components/ui.jsx'
 import { ExamCodeForm, useNow } from '../../components/student.jsx'
 import { fmtDateTime, fmtNote, TOOLS } from '../../lib/format.js'
@@ -63,6 +64,7 @@ export default function AssessmentDetail() {
     [Clock, a.kind === 'examen' ? `Durée : ${a.durationMin} minutes, chronomètre visible pendant toute l'épreuve.` : `Date limite : ${fmtDateTime(a.endAt)}.`],
     [ListChecks, `${a.questionCount} question${a.questionCount > 1 ? 's' : ''}, ${a.maxPoints} points au total.`],
     a.languages?.length > 0 && [FileCode2, languageRule(a.languages, execution)],
+    a.kind === 'examen' && a.security.sebRequired && [ShieldCheck, inSafeExamBrowser() ? 'Examen sous Safe Exam Browser : vous y êtes, tout est prêt.' : 'Cet examen se passe uniquement dans Safe Exam Browser, sur un poste de la salle d\'examen (le surveillant vous l\'indique). Il ne peut pas s\'ouvrir dans un navigateur ordinaire.'],
     a.security.fullscreen && [Maximize, "L'épreuve se fait en plein écran. Une sortie du plein écran est enregistrée."],
     a.security.exitWarnings && [TriangleAlert, 'Si vous quittez l\'épreuve (plein écran ou changement de fenêtre), un avertissement s\'affiche. À la troisième sortie, votre copie est envoyée automatiquement.'],
     a.security.blockPaste && [ClipboardX, "Le copier-coller depuis l'extérieur est bloqué. Dans l'éditeur, vous pouvez copier-coller votre propre code."],

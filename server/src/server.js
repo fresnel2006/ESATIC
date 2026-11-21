@@ -30,7 +30,15 @@ async function readBody(req) {
 async function handleRequest(req, res, name) {
   const body = await readBody(req)
   if (body === null) return send(res, 413, fail('Requête trop volumineuse.', 'too_large', 413))
-  const out = await handleApi({ method: req.method, name, body, tokenHeader: req.headers['x-esatic-token'], ip: req.socket.remoteAddress })
+  const out = await handleApi({
+    method: req.method, name, body, tokenHeader: req.headers['x-esatic-token'], ip: req.socket.remoteAddress,
+    // Navigateur utilisé : Safe Exam Browser s'annonce dans son identifiant et ses en-têtes
+    client: {
+      userAgent: String(req.headers['user-agent'] || ''),
+      sebConfigKeyHash: String(req.headers['x-safeexambrowser-configkeyhash'] || ''),
+      sebRequestHash: String(req.headers['x-safeexambrowser-requesthash'] || ''),
+    },
+  })
   send(res, out.status, out.body)
 }
 

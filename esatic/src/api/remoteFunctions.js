@@ -43,6 +43,8 @@ export const REMOTE_FUNCTIONS = [
   'studentAbsences',
   'justifyAbsence',
   'myAbsences',
+  'switchRole',
+  'setSupervisedClasses',
   'attendanceWeek',
   'visaAttendanceWeek',
   'submitJustification',

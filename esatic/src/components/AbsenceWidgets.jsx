@@ -9,6 +9,9 @@ import { Avatar, Empty, ErrorBox, Loader, ResponsiveTable, Stat, useAsync } from
 import { LEVELS, LEVEL_NAMES } from '../api/constants.js'
 import { downloadCsv } from '../lib/format.js'
 import AttendanceSheet from './AttendanceSheet.jsx'
+import ClassPicker from './ClassPicker.jsx'
+import { Modal } from './ui.jsx'
+import { useAuth } from '../context/AuthContext.jsx'
 import { JustificationCard } from './JustificationWidgets.jsx'
 
 // 3.5 -> « 3 h 30 » ; 2 -> « 2 h »
@@ -162,15 +165,38 @@ function ClassAbsences({ classeId, onOpen }) {
   )
 }
 
+// Éducateur : choix des classes qu'il suit (elles apparaissent en premier)
+function MyClassesForm({ classes, onClose, onSaved }) {
+  const toast = useToast()
+  const [ids, setIds] = useState(classes.filter((c) => c.mine).map((c) => c.id))
+  const [busy, setBusy] = useState(false)
+  async function save() {
+    setBusy(true)
+    try { await api.setSupervisedClasses(ids); toast.success('Vos classes sont enregistrées.'); onSaved(); onClose() } catch (e) { toast.error(e.message) } finally { setBusy(false) }
+  }
+  return (
+    <Modal wide title="Les classes que je suis" onClose={onClose} footer={<>
+      <button className="btn btn-secondary" onClick={onClose}>Annuler</button>
+      <button className="btn btn-primary" disabled={busy} onClick={save}>Enregistrer</button>
+    </>}>
+      <p className="small muted" style={{ marginTop: 0 }}>Cochez les classes dont vous êtes l'éducateur : elles apparaissent en premier, et les justificatifs de leurs étudiants vous sont signalés. Vous gardez l'accès à toutes les classes.</p>
+      <ClassPicker classes={classes.map((c) => ({ id: c.id, name: c.name, level: c.level }))} value={ids} onChange={setIds} />
+    </Modal>
+  )
+}
+
 // Choix de la classe (par niveau), puis la classe ou la fiche d'un étudiant (dans l'adresse : ?classe=&etudiant=)
 export function AbsencesBrowser() {
-  const { data, loading, error } = useAsync(() => api.absenceOverview(), [])
+  const { user } = useAuth()
+  const { data, loading, error, reload } = useAsync(() => api.absenceOverview(), [])
+  const [choosing, setChoosing] = useState(false)
   const [params, setParams] = useSearchParams()
   const setP = (p, push = false) => setParams((cur) => { const n = new URLSearchParams(cur); for (const [k, v] of Object.entries(p)) (v == null ? n.delete(k) : n.set(k, v)); return n }, { replace: !push })
   if (error) return <ErrorBox error={error} />
   if (loading && !data) return <Loader variant="list" />
   if (!data.length) return <div className="card"><Empty icon={Users} title="Aucune classe">Aucune classe ne vous est affectée pour le moment.</Empty></div>
-  const classeId = Number(params.get('classe')) || (data.find((c) => c.sessions > 0) || data.find((c) => c.students > 0) || data[0]).id
+  const mine = data.filter((c) => c.mine)
+  const classeId = Number(params.get('classe')) || (mine[0] || data.find((c) => c.sessions > 0) || data.find((c) => c.students > 0) || data[0]).id
   const studentId = Number(params.get('etudiant')) || null
   const view = params.get('vue')
   const groups = [...LEVELS, ...new Set(data.map((c) => c.level).filter((l) => !LEVELS.includes(l)))]
@@ -182,13 +208,20 @@ export function AbsencesBrowser() {
       <div className="abs-picker">
         <label htmlFor="abs-classe" className="label">Classe</label>
         <select id="abs-classe" className="select" value={classeId} onChange={(e) => setP({ classe: e.target.value, etudiant: null })}>
+          {mine.length > 0 && (
+            <optgroup label="Mes classes">
+              {mine.map((c) => <option key={`m${c.id}`} value={c.id}>{c.name} · {c.students} étudiant{c.students > 1 ? 's' : ''} · {c.sessions} appel{c.sessions > 1 ? 's' : ''}</option>)}
+            </optgroup>
+          )}
           {groups.map((g) => (
             <optgroup key={g.level} label={LEVEL_NAMES[g.level] || g.level}>
               {g.list.map((c) => <option key={c.id} value={c.id}>{c.name} · {c.students} étudiant{c.students > 1 ? 's' : ''} · {c.sessions} appel{c.sessions > 1 ? 's' : ''}</option>)}
             </optgroup>
           ))}
         </select>
+        {user?.role === 'educator' && <button className="btn btn-secondary btn-sm" onClick={() => setChoosing(true)}>Mes classes{mine.length ? ` (${mine.length})` : ''}</button>}
       </div>
+      {choosing && <MyClassesForm classes={data} onClose={() => setChoosing(false)} onSaved={reload} />}
       <div className="eval-tabs" role="tablist">
         <button role="tab" aria-selected={view !== 'cahier'} className={view !== 'cahier' ? 'on' : ''} onClick={() => setP({ vue: null })}>Heures d'absence</button>
         <button role="tab" aria-selected={view === 'cahier'} className={view === 'cahier' ? 'on' : ''} onClick={() => setP({ vue: 'cahier' })}>Cahier d'appels (semaine)</button>

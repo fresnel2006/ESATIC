@@ -56,6 +56,12 @@ export function AuthProvider({ children }) {
       setUser(u)
       return u
     },
+    // Compte à plusieurs rôles (enseignant et éducateur) : passer d'un espace à l'autre
+    async switchRole(role) {
+      const u = await api.switchRole(role)
+      setUser(u)
+      return u
+    },
     async logout() {
       await api.logout()
       setUser(null)

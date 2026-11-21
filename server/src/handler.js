@@ -85,14 +85,16 @@ function parseToken(raw) {
   if (!raw || typeof raw !== 'string') return null
   try {
     const t = JSON.parse(raw)
-    return t && typeof t.token === 'string' && Number.isInteger(t.userId) ? { userId: t.userId, token: t.token } : null
+    if (!t || typeof t.token !== 'string' || !Number.isInteger(t.userId)) return null
+    // Rôle actif (compte à plusieurs rôles) : vérifié ensuite par la logique, parmi les rôles du compte
+    return typeof t.role === 'string' && /^[a-z]{3,12}$/.test(t.role) ? { userId: t.userId, token: t.token, role: t.role } : { userId: t.userId, token: t.token }
   } catch {
     return null
   }
 }
 
-// { method, name, body, tokenHeader, ip } -> { status, body }
-export async function handleApi({ method, name, body, tokenHeader, ip }) {
+// { method, name, body, tokenHeader, ip, client } -> { status, body }
+export async function handleApi({ method, name, body, tokenHeader, ip, client = null }) {
   if (method !== 'POST') return { status: 405, body: fail('Méthode non autorisée.', 'method', 405) }
   if (!ALLOWED.has(name)) return { status: 404, body: fail('Fonction inconnue.', 'not_found', 404) }
   if (name === 'login' && (await recentFailures(ip)).length >= MAX_FAILURES) {
@@ -103,7 +105,7 @@ export async function handleApi({ method, name, body, tokenHeader, ip }) {
     try { parsed = body ? JSON.parse(body) : {} } catch { return { status: 400, body: fail('Requête invalide.', 'bad_request', 400) } }
   }
   const args = Array.isArray(parsed?.args) ? parsed.args : []
-  const ctx = { tokenIn: parseToken(tokenHeader) }
+  const ctx = { tokenIn: parseToken(tokenHeader), client }
   const withToken = (b) => (ctx.out !== undefined ? { ...b, token: ctx.out } : b)
 
   try {

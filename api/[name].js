@@ -10,6 +10,12 @@ export default async function handler(req, res) {
     body: req.body ?? {},
     tokenHeader: req.headers['x-esatic-token'],
     ip: forwarded || req.socket?.remoteAddress || 'inconnue',
+    // Navigateur utilisé : Safe Exam Browser s'annonce dans son identifiant et ses en-têtes
+    client: {
+      userAgent: String(req.headers['user-agent'] || ''),
+      sebConfigKeyHash: String(req.headers['x-safeexambrowser-configkeyhash'] || ''),
+      sebRequestHash: String(req.headers['x-safeexambrowser-requesthash'] || ''),
+    },
   })
   res.setHeader('Cache-Control', 'no-store')
   res.status(status).json(body)

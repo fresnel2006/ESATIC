@@ -1,4 +1,5 @@
-import { lazy, Suspense } from 'react'
+import { Suspense } from 'react'
+import { page } from './pages/prefetch.js'
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { useAuth } from './context/AuthContext.jsx'
 import AppLayout from './components/AppLayout.jsx'
@@ -9,51 +10,50 @@ import { ROLE_HOME } from './lib/format.js'
 import Login from './pages/Login.jsx'
 
 // Pages chargées à la demande : la première page ne télécharge que le nécessaire
-const ChangePassword = lazy(() => import('./pages/account/ChangePassword.jsx'))
-const Profile = lazy(() => import('./pages/account/Profile.jsx'))
-const NotFound = lazy(() => import('./pages/NotFound.jsx'))
+const ChangePassword = page(() => import('./pages/account/ChangePassword.jsx'), [])
+const Profile = page(() => import('./pages/account/Profile.jsx'), [])
+const NotFound = page(() => import('./pages/NotFound.jsx'), [])
 
-const StudentHome = lazy(() => import('./pages/student/StudentHome.jsx'))
-const StudentDevoirs = lazy(() => import('./pages/student/StudentDevoirs.jsx'))
-const StudentExamens = lazy(() => import('./pages/student/StudentExamens.jsx'))
-const StudentResultats = lazy(() => import('./pages/student/StudentResultats.jsx'))
-const StudentResultDetail = lazy(() => import('./pages/student/StudentResultDetail.jsx'))
-const StudentAnnonces = lazy(() => import('./pages/student/StudentAnnonces.jsx'))
-const AssessmentDetail = lazy(() => import('./pages/student/AssessmentDetail.jsx'))
+const StudentHome = page(() => import('./pages/student/StudentHome.jsx'), ['student'])
+const StudentDevoirs = page(() => import('./pages/student/StudentDevoirs.jsx'), ['student'])
+const StudentExamens = page(() => import('./pages/student/StudentExamens.jsx'), ['student'])
+const StudentResultats = page(() => import('./pages/student/StudentResultats.jsx'), ['student'])
+const StudentResultDetail = page(() => import('./pages/student/StudentResultDetail.jsx'), ['student'])
+const StudentAnnonces = page(() => import('./pages/student/StudentAnnonces.jsx'), ['student'])
+const AssessmentDetail = page(() => import('./pages/student/AssessmentDetail.jsx'), ['student'])
 
-const TeacherHome = lazy(() => import('./pages/teacher/TeacherHome.jsx'))
-const TeacherEpreuves = lazy(() => import('./pages/teacher/TeacherEpreuves.jsx'))
-const QuestionBank = lazy(() => import('./pages/teacher/QuestionBank.jsx'))
-const Corrections = lazy(() => import('./pages/teacher/Corrections.jsx'))
-const CorrectionDetail = lazy(() => import('./pages/teacher/CorrectionDetail.jsx'))
-const CorrectionByQuestion = lazy(() => import('./pages/teacher/CorrectionByQuestion.jsx'))
-const TeacherResultats = lazy(() => import('./pages/teacher/TeacherResultats.jsx'))
-const TeacherClasses = lazy(() => import('./pages/teacher/TeacherClasses.jsx'))
+const TeacherHome = page(() => import('./pages/teacher/TeacherHome.jsx'), ['teacher'])
+const TeacherEpreuves = page(() => import('./pages/teacher/TeacherEpreuves.jsx'), ['teacher'])
+const QuestionBank = page(() => import('./pages/teacher/QuestionBank.jsx'), ['teacher'])
+const Corrections = page(() => import('./pages/teacher/Corrections.jsx'), ['teacher'])
+const CorrectionDetail = page(() => import('./pages/teacher/CorrectionDetail.jsx'), ['teacher'])
+const CorrectionByQuestion = page(() => import('./pages/teacher/CorrectionByQuestion.jsx'), ['teacher'])
+const TeacherResultats = page(() => import('./pages/teacher/TeacherResultats.jsx'), ['teacher'])
+const TeacherClasses = page(() => import('./pages/teacher/TeacherClasses.jsx'), ['teacher'])
 
-const ProctorSessions = lazy(() => import('./pages/proctor/ProctorSessions.jsx'))
-const ProctorSessionDetail = lazy(() => import('./pages/proctor/ProctorSessionDetail.jsx'))
-const ProctorAlertes = lazy(() => import('./pages/proctor/ProctorAlertes.jsx'))
-const ProctorHistorique = lazy(() => import('./pages/proctor/ProctorHistorique.jsx'))
+const ProctorSessions = page(() => import('./pages/proctor/ProctorSessions.jsx'), ['proctor'])
+const ProctorSessionDetail = page(() => import('./pages/proctor/ProctorSessionDetail.jsx'), ['proctor'])
+const ProctorAlertes = page(() => import('./pages/proctor/ProctorAlertes.jsx'), ['proctor'])
+const ProctorHistorique = page(() => import('./pages/proctor/ProctorHistorique.jsx'), ['proctor'])
 
-const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard.jsx'))
-const AdminUsers = lazy(() => import('./pages/admin/AdminUsers.jsx'))
-const AdminStructure = lazy(() => import('./pages/admin/AdminStructure.jsx'))
-const AdminEpreuves = lazy(() => import('./pages/admin/AdminEpreuves.jsx'))
-const BulletinsDepot = lazy(() => import('./pages/BulletinsDepot.jsx'))
-const PedagogyEvaluations = lazy(() => import('./pages/PedagogyEvaluations.jsx'))
-const StudentEvaluations = lazy(() => import('./pages/student/StudentEvaluations.jsx'))
-const TeacherEvaluations = lazy(() => import('./pages/teacher/TeacherEvaluations.jsx'))
-const TimetablesManage = lazy(() => import('./pages/TimetablesManage.jsx'))
-const MyTimetables = lazy(() => import('./pages/MyTimetables.jsx'))
-const AbsencesPage = lazy(() => import('./pages/AbsencesPage.jsx'))
-const StudentAbsences = lazy(() => import('./pages/student/StudentAbsences.jsx'))
-const TeacherAttendance = lazy(() => import('./pages/teacher/TeacherAttendance.jsx'))
-const AdminJournal = lazy(() => import('./pages/admin/AdminJournal.jsx'))
-const AdminParametres = lazy(() => import('./pages/admin/AdminParametres.jsx'))
+const AdminDashboard = page(() => import('./pages/admin/AdminDashboard.jsx'), ['admin'])
+const AdminUsers = page(() => import('./pages/admin/AdminUsers.jsx'), ['admin'])
+const AdminStructure = page(() => import('./pages/admin/AdminStructure.jsx'), ['admin'])
+const AdminEpreuves = page(() => import('./pages/admin/AdminEpreuves.jsx'), ['admin'])
+const BulletinsDepot = page(() => import('./pages/BulletinsDepot.jsx'), ['educator', 'pedagogy', 'admin'])
+const PedagogyEvaluations = page(() => import('./pages/PedagogyEvaluations.jsx'), ['pedagogy'])
+const StudentEvaluations = page(() => import('./pages/student/StudentEvaluations.jsx'), ['student'])
+const TimetablesManage = page(() => import('./pages/TimetablesManage.jsx'), ['pedagogy', 'admin'])
+const MyTimetables = page(() => import('./pages/MyTimetables.jsx'), ['student', 'teacher'])
+const AbsencesPage = page(() => import('./pages/AbsencesPage.jsx'), ['educator', 'pedagogy', 'admin'])
+const StudentAbsences = page(() => import('./pages/student/StudentAbsences.jsx'), ['student'])
+const TeacherAttendance = page(() => import('./pages/teacher/TeacherAttendance.jsx'), ['teacher'])
+const AdminJournal = page(() => import('./pages/admin/AdminJournal.jsx'), ['admin'])
+const AdminParametres = page(() => import('./pages/admin/AdminParametres.jsx'), ['admin'])
 
 // Pages lourdes (éditeur Monaco)
-const TakeAttempt = lazy(() => import('./pages/student/TakeAttempt.jsx'))
-const EpreuveWizard = lazy(() => import('./pages/teacher/EpreuveWizard.jsx'))
+const TakeAttempt = page(() => import('./pages/student/TakeAttempt.jsx'), [])
+const EpreuveWizard = page(() => import('./pages/teacher/EpreuveWizard.jsx'), [])
 
 function RequireAuth({ roles, children }) {
   const { user, loading } = useAuth()
@@ -112,7 +112,6 @@ export default function App() {
         <Route path="/enseignant/classes" element={<RequireAuth roles={['teacher']}><TeacherClasses /></RequireAuth>} />
         <Route path="/enseignant/appel" element={<RequireAuth roles={['teacher']}><TeacherAttendance /></RequireAuth>} />
         <Route path="/enseignant/emplois-du-temps" element={<RequireAuth roles={['teacher']}><MyTimetables /></RequireAuth>} />
-        <Route path="/enseignant/evaluations" element={<RequireAuth roles={['teacher']}><TeacherEvaluations /></RequireAuth>} />
 
         <Route path="/surveillant/sessions" element={<RequireAuth roles={['proctor']}><ProctorSessions /></RequireAuth>} />
         <Route path="/surveillant/sessions/:id" element={<RequireAuth roles={['proctor']}><ProctorSessionDetail /></RequireAuth>} />

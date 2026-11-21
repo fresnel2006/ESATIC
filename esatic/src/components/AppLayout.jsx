@@ -2,13 +2,14 @@ import { Suspense, useEffect, useRef, useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import {
   ArrowUpRight, ArrowDownRight, Search, Bell, ChevronsLeft, ChevronsRight,
-  UserRound, KeyRound, Moon, Sun, LogOut, Ellipsis, X, ChevronDown, Lock,
+  UserRound, KeyRound, Moon, Sun, LogOut, Ellipsis, X, ChevronDown, Lock, Repeat, TriangleAlert,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext.jsx'
 import { NAV } from './nav.js'
+import { prefetchPages } from '../pages/prefetch.js'
 import Logo from './Logo.jsx'
 import { Avatar, ICON, Loader } from './ui.jsx'
-import { ROLE_LABELS, fmtAgo } from '../lib/format.js'
+import { ROLE_HOME, ROLE_LABELS, fmtAgo } from '../lib/format.js'
 import * as api from '../api/index.js'
 
 function useClickOutside(ref, onOut) {
@@ -156,9 +157,10 @@ function AccountMenu({ user, theme, toggleTheme, compact }) {
   const [open, setOpen] = useState(false)
   const ref = useRef(null)
   const navigate = useNavigate()
-  const { logout } = useAuth()
+  const { logout, switchRole } = useAuth()
   useClickOutside(ref, () => setOpen(false))
   const go = (p) => { setOpen(false); navigate(p) }
+  const others = (user.roles || []).filter((r) => r !== user.role)
   return (
     <div className="menu-anchor" ref={ref}>
       <button className="account-btn" onClick={() => setOpen((o) => !o)} aria-label="Menu du compte" aria-expanded={open}>
@@ -173,6 +175,11 @@ function AccountMenu({ user, theme, toggleTheme, compact }) {
             <strong>{user.fullName}</strong>
             <span className="d-sub">{ROLE_LABELS[user.role]} - {user.matricule}</span>
           </div>
+          {others.map((r) => (
+            <button key={r} className="dropdown-item" onClick={async () => { setOpen(false); const u = await switchRole(r); navigate(ROLE_HOME[u.role]) }}>
+              <Repeat {...ICON} /> Passer à l'espace {ROLE_LABELS[r].toLowerCase()}
+            </button>
+          ))}
           <button className="dropdown-item" onClick={() => go('/compte/profil')}><UserRound {...ICON} /> Profil</button>
           <button className="dropdown-item" onClick={() => go('/compte/mot-de-passe')}><KeyRound {...ICON} /> Mot de passe</button>
           <button className="dropdown-item" onClick={toggleTheme}>
@@ -201,6 +208,66 @@ function useGates(role, pathname) {
   return gates
 }
 
+// Surveillant : toutes les 10 s, les nouvelles sorties d'examen (sessions ouvertes) s'affichent à l'écran avec un son,
+// quelle que soit la page ouverte. Les sorties déjà connues à l'ouverture de la page ne sont pas rejouées.
+const EXIT_TYPES = ['exit_counted', 'fullscreen_exit', 'tab_hidden', 'window_left', 'navigation_away', 'auto_submitted_exits']
+const EXIT_TEXT = { fullscreen_exit: 'a quitté le plein écran', tab_hidden: 'a changé d\'onglet', window_left: 'a changé de fenêtre', navigation_away: 'a tenté de quitter la page', exit_counted: 'a quitté l\'épreuve', auto_submitted_exits: 'est sorti(e) une fois de trop : copie envoyée' }
+function beep() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)()
+    const o = ctx.createOscillator(); const g = ctx.createGain()
+    o.frequency.value = 880; g.gain.value = 0.08
+    o.connect(g); g.connect(ctx.destination); o.start(); o.stop(ctx.currentTime + 0.25)
+  } catch { /* son indisponible */ }
+}
+function useExitAlerts(role) {
+  const navigate = useNavigate()
+  const [live, setLive] = useState([])
+  useEffect(() => {
+    if (role !== 'proctor') return
+    const seen = new Set()
+    let first = true
+    let alive = true
+    const check = () => {
+      if (document.hidden) return
+      api.listAlerts().then((list) => {
+        if (!alive) return
+        const fresh = list.filter((e) => e.sessionOpen && EXIT_TYPES.includes(e.type) && !seen.has(`${e.attemptId}|${e.at}|${e.type}`))
+        for (const e of list) seen.add(`${e.attemptId}|${e.at}|${e.type}`)
+        if (first) { first = false; return }
+        // Une alerte par étudiant (plusieurs événements d'une même sortie arrivent ensemble)
+        const byStudent = new Map()
+        for (const e of fresh) if (!byStudent.has(e.attemptId) || e.type === 'exit_counted' || e.type === 'auto_submitted_exits') byStudent.set(e.attemptId, e)
+        if (byStudent.size) {
+          beep()
+          setLive((cur) => [...[...byStudent.values()].map((e) => ({ ...e, key: `${e.attemptId}|${e.at}` })), ...cur].slice(0, 4))
+        }
+      }).catch(() => {})
+    }
+    check()
+    const id = setInterval(check, 10000)
+    document.addEventListener('visibilitychange', check)
+    return () => { alive = false; clearInterval(id); document.removeEventListener('visibilitychange', check) }
+  }, [role])
+  const close = (key) => setLive((cur) => cur.filter((x) => x.key !== key))
+  if (!live.length) return null
+  return (
+    <div className="exit-alerts" role="alert" aria-live="assertive">
+      {live.map((e) => (
+        <div key={e.key} className={`exit-alert ${e.type === 'auto_submitted_exits' ? 'grave' : ''}`}>
+          <TriangleAlert size={20} />
+          <div className="exit-alert-text">
+            <strong>{e.student} {EXIT_TEXT[e.type] || 'a quitté l\'épreuve'}</strong>
+            <span className="small">{e.title}{e.detail?.n ? ` · sortie ${e.detail.n}` : ''} · {fmtAgo(e.at)}</span>
+          </div>
+          <button className="btn btn-secondary btn-sm" onClick={() => { close(e.key); navigate(`/surveillant/sessions/${e.sessionId}`) }}>Voir</button>
+          <button className="icon-btn" aria-label="Fermer" onClick={() => close(e.key)}><X size={16} /></button>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 export default function AppLayout() {
   const { user } = useAuth()
   const location = useLocation()
@@ -209,6 +276,9 @@ export default function AppLayout() {
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem('esatic-sidebar') === '1')
   const [moreOpen, setMoreOpen] = useState(false)
   const gates = useGates(user.role, location.pathname)
+  const exitAlerts = useExitAlerts(user.role)
+  // Pages de l'espace préparées en arrière-plan
+  useEffect(() => { prefetchPages(user.role) }, [user.role])
   const locked = (it) => it.gate && !gates[it.gate]
   const items = NAV[user.role] || []
   const title = currentTitle(items, location.pathname)
@@ -276,6 +346,7 @@ export default function AppLayout() {
         </main>
       </div>
 
+      {exitAlerts}
       <nav className="bottomnav" aria-label="Navigation">
         {mobileItems.map((it) => (
           <NavLink key={it.to} to={it.to} end={it.end} className="bn-item">

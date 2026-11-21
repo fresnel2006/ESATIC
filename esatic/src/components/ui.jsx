@@ -384,15 +384,29 @@ export function ResponsiveTable({ columns, rows, rowKey = 'id', empty, onRowClic
   )
 }
 
+// Dernières données de chaque page (mémoire de l'onglet, propre à la session) : en revenant sur une page, elles
+// s'affichent tout de suite, puis sont remplacées par les données à jour dès qu'elles arrivent.
+const pageCache = new Map()
+const cacheKey = (fn, deps) => `${sessionStorage.getItem('esatic-token') || ''}|${fn.toString()}|${JSON.stringify(deps)}`
+
 export function useAsync(fn, deps = []) {
-  const [state, setState] = useState({ data: null, loading: true, error: null })
+  const [state, setState] = useState(() => {
+    const hit = pageCache.get(cacheKey(fn, deps))
+    return hit !== undefined ? { data: hit, loading: true, error: null } : { data: null, loading: true, error: null }
+  })
   const [tick, setTick] = useState(0)
   useEffect(() => {
     let alive = true
+    const key = cacheKey(fn, deps)
+    const hit = pageCache.get(key)
     // eslint-disable-next-line react-hooks/set-state-in-effect -- indicateur de rechargement
-    setState((s) => ({ ...s, loading: true }))
+    setState((s) => ({ ...s, data: hit !== undefined ? hit : s.data, loading: true }))
     fn()
-      .then((data) => alive && setState({ data, loading: false, error: null }))
+      .then((data) => {
+        if (pageCache.size > 60) pageCache.delete(pageCache.keys().next().value)
+        pageCache.set(key, data)
+        if (alive) setState({ data, loading: false, error: null })
+      })
       .catch((error) => alive && setState({ data: null, loading: false, error }))
     return () => {
       alive = false

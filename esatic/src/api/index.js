@@ -48,6 +48,8 @@ const local = (name) => async (...args) => (await loadCore())[name](...args)
 const pick = (name) => (REMOTE ? remote(name) : local(name))
 
 export const login = pick('login')
+export const switchRole = pick('switchRole')
+export const setSupervisedClasses = pick('setSupervisedClasses')
 export const testAccounts = pick('testAccounts')
 export const testLogin = pick('testLogin')
 export const logout = pick('logout')

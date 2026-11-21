@@ -72,10 +72,10 @@ function EvalForm({ campaign, target, criteria, onClose, onDone }) {
         </div>
         <div className="field">
           <label htmlFor="eval-comment">Commentaire (facultatif)</label>
-          <textarea id="eval-comment" className="textarea" maxLength={1000} value={comment} onChange={(e) => setComment(e.target.value)} placeholder="Points forts, suggestions pour améliorer le cours... Restez courtois : ce commentaire sera lu par l'enseignant." />
+          <textarea id="eval-comment" className="textarea" maxLength={1000} value={comment} onChange={(e) => setComment(e.target.value)} placeholder="Points forts, suggestions pour améliorer le cours... Restez courtois : ce commentaire sera lu par la direction pédagogique." />
           <span className="hint">{comment.length} / 1000 caractères</span>
         </div>
-        <div className="eval-anon"><ShieldCheck size={16} /> Évaluation anonyme : votre nom n'est jamais enregistré avec vos réponses. Ni l'enseignant ni la direction pédagogique ne peuvent savoir qui a voté ; ils ne voient que des moyennes et des commentaires, à partir de 3 réponses. Une seule évaluation par enseignant et par matière, non modifiable.</div>
+        <div className="eval-anon"><ShieldCheck size={16} /> Évaluation anonyme : votre nom n'est jamais enregistré avec vos réponses. Personne ne peut savoir qui a voté. Seule la direction pédagogique voit les résultats (moyennes et commentaires, à partir de 3 réponses) ; l'enseignant ne les voit pas. Une seule évaluation par enseignant et par matière, non modifiable.</div>
         {error && <Notice kind="danger">{error}</Notice>}
       </div>
     </Modal>

@@ -40,6 +40,8 @@ core.configurePlatform({
   },
   // Évaluation des enseignants : participations et réponses anonymes, rangées à part
   store: { createAll: storeCreateAll, query: storeQuery, count: storeCount, get: storeGet, put: storePut },
+  // Navigateur de la requête en cours (vérification de Safe Exam Browser)
+  client: () => ctx()?.client ?? null,
   getToken: () => ctx()?.token ?? null,
   setToken: (t) => { const c = ctx(); if (c) { c.token = t; c.out = t } },
   clearToken: () => { const c = ctx(); if (c) { c.token = null; c.out = null } },

@@ -157,10 +157,12 @@ function migrate() {
     // Avertissements puis envoi de la copie : activé par défaut pour les examens surveillés.
     // Règle de l'école : avertissement aux 1re et 2e sorties, copie envoyée à la 3e (exitWarnings = 2).
     if (a.security && a.security.exitWarnings === undefined) {
-      a.security.exitWarnings = a.kind === 'examen' && a.security.fullscreen ? 2 : null
+      a.security.exitWarnings = a.security.fullscreen ? 2 : null
       changed = true
     }
     if (a.security?.exitWarnings === 1) { a.security.exitWarnings = 2; changed = true } // ancienne règle (envoi à la 2e)
+    // Plein écran obligatoire (devoir comme examen) : copie envoyée à la 3e sortie (appliqué une fois aux épreuves existantes)
+    if (a.security?.fullscreen && !a.security.exitWarnings && !a.security.exitRuleAll) { a.security.exitWarnings = 2; a.security.exitRuleAll = true; changed = true }
   }
   // Ajouts de démonstration : seulement dans une base de démonstration, jamais dans la vraie base de l'école.
   // (Base de démo : school.demo vrai ; les bases de démo plus anciennes se reconnaissent au compte ETU24001.)
@@ -305,6 +307,19 @@ function currentToken() {
   return platform.getToken()
 }
 
+// Rôles d'un compte : son rôle principal et, au besoin, un rôle en plus (un enseignant peut aussi être éducateur).
+// Le rôle actif est choisi à la connexion et gardé dans le jeton de session ; il doit faire partie des rôles du compte.
+const EXTRA_ROLES = { teacher: ['educator'] }
+// Rôle principal du compte, même vu à travers son rôle actif
+const PRIMARY_ROLE = Symbol('primaryRole')
+const primaryRole = (u) => u[PRIMARY_ROLE] ?? u.role
+const rolesOf = (u) => { const main = primaryRole(u); return [main, ...(Array.isArray(u.extraRoles) ? u.extraRoles.filter((r) => (EXTRA_ROLES[main] || []).includes(r)) : [])] }
+// Le compte vu avec son rôle actif : même objet (les modifications l'atteignent), seul « role » change
+function withActiveRole(user, role) {
+  if (!role || role === primaryRole(user) || !rolesOf(user).includes(role)) return user
+  return new Proxy(user, { get: (target, key, receiver) => (key === 'role' ? role : key === PRIMARY_ROLE ? target.role : Reflect.get(target, key, receiver)) })
+}
+
 function requireUser(...roles) {
   const t = currentToken()
   if (!t) throw new ApiError('Session expirée, reconnectez-vous.', 'unauthenticated', 401)
@@ -321,10 +336,11 @@ function requireUser(...roles) {
       401,
     )
   }
-  if (roles.length && !roles.includes(user.role)) {
+  const active = withActiveRole(user, t.role)
+  if (roles.length && !roles.includes(active.role)) {
     throw new ApiError('Accès non autorisé pour votre rôle.', 'forbidden', 403)
   }
-  return user
+  return active
 }
 
 function publicUser(u) {
@@ -333,7 +349,18 @@ function publicUser(u) {
   delete rest.passwordHash
   delete rest.activeToken
   const classe = db.classes.find((c) => c.id === u.classeId)
-  return { ...rest, fullName: `${u.firstName} ${u.lastName}`, classe: classe ? classe.name : null }
+  return { ...rest, roles: rolesOf(u), fullName: `${u.firstName} ${u.lastName}`, classe: classe ? classe.name : null }
+}
+
+// POST /api/auth/role { role } : passer à un autre de ses rôles (enseignant <-> éducateur) sans se reconnecter
+export async function switchRole(role) {
+  await load()
+  const user = requireUser()
+  const t = currentToken()
+  if (!rolesOf(user).includes(role)) throw new ApiError('Ce rôle ne fait pas partie de votre compte.', 'forbidden', 403)
+  platform.setToken({ userId: t.userId, token: t.token, role })
+  audit(user, 'changement_espace', `${user.firstName} ${user.lastName}`, role)
+  return publicUser(withActiveRole(db.users.find((u) => u.id === t.userId), role))
 }
 
 function audit(user, action, target, detail = '') {
@@ -611,9 +638,14 @@ export async function saveUser(data) {
     throw new ApiError('Cet email est déjà utilisé.')
   }
   if (data.role === 'student' && !data.classeId) throw new ApiError('Un étudiant doit être rattaché à une classe.')
+  const extraRoles = (Array.isArray(data.extraRoles) ? data.extraRoles : []).filter((r) => (EXTRA_ROLES[data.role] || []).includes(r))
+  const isEducator = data.role === 'educator' || extraRoles.includes('educator')
   const fields = {
     matricule, email, firstName: data.firstName.trim(), lastName: data.lastName.trim(), role: data.role,
     classeId: data.role === 'student' ? Number(data.classeId) : null,
+    extraRoles,
+    // Classes suivies par un éducateur (il peut aussi les choisir lui-même)
+    supervisedClasseIds: isEducator ? [...new Set((data.supervisedClasseIds || []).map(Number))].filter((id) => db.classes.some((c) => c.id === id)) : [],
   }
   if (data.id) {
     const user = db.users.find((u) => u.id === data.id)
@@ -1285,6 +1317,7 @@ export async function startAttempt(assessmentId, sessionCode = null) {
 
   let session = null
   if (a.kind === 'examen') {
+    assertSeb(a)
     session = db.sessions.find((s) => s.assessmentId === a.id && s.status === 'ouverte') ?? null
     if (!free) {
       if (!session) throw new ApiError('La session d\'examen n\'est pas ouverte.', 'not_open', 409)
@@ -1311,6 +1344,18 @@ function ownAttempt(user, attemptId) {
   const att = db.attempts.find((x) => x.id === Number(attemptId) && x.studentId === user.id)
   if (!att) throw new ApiError('Copie introuvable.', 'not_found', 404)
   return att
+}
+
+// Safe Exam Browser : la requête vient-elle de SEB ? (il s'annonce « SEB/x.y » dans l'identifiant du navigateur et
+// ajoute ses en-têtes X-SafeExamBrowser-*). En démo, on regarde le navigateur lui-même.
+function fromSeb() {
+  if (!platform.server) return typeof navigator !== 'undefined' && /SEB\//i.test(navigator.userAgent)
+  const c = platform.client?.()
+  return !!c && (/SEB\//i.test(c.userAgent || '') || !!c.sebConfigKeyHash || !!c.sebRequestHash)
+}
+const SEB_MESSAGE = 'Cet examen se passe uniquement dans Safe Exam Browser, sur un poste de la salle d\'examen. Ouvrez la plateforme depuis Safe Exam Browser (demandez au surveillant).'
+function assertSeb(a) {
+  if (a?.kind === 'examen' && a.security?.sebRequired && !fromSeb()) throw new ApiError(SEB_MESSAGE, 'seb_required', 403)
 }
 
 // Sorties de l'épreuve déjà comptées (avertissements), conservées même si la page est rechargée
@@ -1381,6 +1426,7 @@ export async function saveAnswers(attemptId, changes) {
   const user = requireUser('student')
   const att = ownAttempt(user, attemptId)
   const a = assertWritable(att)
+  assertSeb(a) // examen sous Safe Exam Browser : pas d'enregistrement depuis un autre navigateur
   for (const [qid, value] of Object.entries(changes)) {
     const q = a.questions.find((x) => String(x.id) === String(qid))
     if (!q) continue
@@ -1409,7 +1455,30 @@ export async function logEvents(attemptId, events) {
   if (att.status !== 'en_cours') return
   for (const e of events) att.events.push({ type: e.type, at: e.at || now(), detail: e.detail || null })
   att.lastSeenAt = now()
+  // Sortie de l'épreuve : le surveillant est prévenu (une fois par sortie ; pas plus d'une fois toutes les 20 s)
+  const exit = events.find((e) => EXIT_EVENTS.includes(e.type))
+  if (exit && (!att.lastExitNotifiedAt || Date.now() - new Date(att.lastExitNotifiedAt).getTime() > 20000)) {
+    att.lastExitNotifiedAt = now()
+    warnProctors(att, user, exitLabel(exit, att))
+  }
   save()
+}
+
+const EXIT_EVENTS = ['exit_counted', 'fullscreen_exit', 'tab_hidden', 'window_left', 'navigation_away']
+function exitLabel(e, att) {
+  const a = db.assessments.find((x) => x.id === att.assessmentId)
+  const max = (a?.security?.exitWarnings ?? 0) + 1
+  const n = countExits(att.events)
+  const what = { fullscreen_exit: 'a quitté le plein écran', tab_hidden: 'a changé d\'onglet', window_left: 'a changé de fenêtre', navigation_away: 'a tenté de quitter la page', exit_counted: 'a quitté l\'épreuve' }[e.type] || 'a quitté l\'épreuve'
+  return `${what}${a?.security?.exitWarnings && n ? ` (sortie ${n} sur ${max})` : ''}`
+}
+// Surveillant de la session (celui qui l'a ouverte) ; à défaut, tous les surveillants
+function warnProctors(att, student, text) {
+  const s = db.sessions.find((x) => x.id === att.sessionId)
+  if (!s) return
+  const a = db.assessments.find((x) => x.id === att.assessmentId)
+  const to = s.proctorId ? [s.proctorId] : db.users.filter((u) => u.role === 'proctor' && u.active).map((u) => u.id)
+  for (const id of to) notify(id, 'Sortie pendant l\'examen', `${student.lastName} ${student.firstName} ${text} - « ${a?.title ?? ''} »${s.room ? `, ${s.room}` : ''}.`, `/surveillant/sessions/${s.id}`)
 }
 
 // POST /api/student/attempts/{id}/submit
@@ -1425,6 +1494,7 @@ export async function submitAttempt(attemptId, finalChanges = {}, reason = null)
   att.submittedAt = now()
   att.events.push({ type: reason === 'exits' ? 'auto_submitted_exits' : 'submitted', at: now(), detail: reason === 'exits' ? { exits: countExits(att.events) + 1 } : null })
   autoGrade(att, a)
+  if (reason === 'exits') warnProctors(att, user, 'a quitté l\'épreuve une fois de trop : copie envoyée automatiquement')
   notify(a.teacherId, reason === 'exits' ? 'Copie envoyée automatiquement' : 'Copie rendue',
     reason === 'exits'
       ? `${user.firstName} ${user.lastName} a quitté « ${a.title} » après l'avertissement : copie envoyée automatiquement.`
@@ -2354,7 +2424,7 @@ export async function getTimetableFile(id) {
 // 1 à 5 et un commentaire facultatif.
 // Anonymat : la réponse est rangée sans l'étudiant ; un registre à part (participation) empêche seulement de
 // répondre deux fois. Les moyennes et commentaires ne s'affichent qu'à partir de EVAL_MIN_RESPONSES réponses.
-// Seule la direction pédagogique voit le tableau de bord de tous les enseignants ; chaque enseignant voit les
+// Seule la direction pédagogique voit les résultats (les enseignants ne voient pas leur évaluation) ; anciennement :
 // siens après la clôture.
 // ---------------------------------------------------------------------------
 
@@ -2538,8 +2608,6 @@ export async function setEvalCampaignStatus(id, status) {
   }
   if (status === 'fermee') {
     c.closedAt = now()
-    // Les enseignants peuvent consulter leurs résultats
-    for (const tid of new Set(db.teaching.map((t) => t.teacherId))) notify(tid, 'Résultats de l\'évaluation', `${c.title} : vos résultats sont disponibles.`, '/enseignant/evaluations')
   }
   audit(actor, status === 'fermee' ? 'cloture_evaluation' : wasDraft ? 'ouverture_evaluation' : 'reouverture_evaluation', c.title)
   save()
@@ -2550,9 +2618,8 @@ export async function setEvalCampaignStatus(id, status) {
 // étudiants, pour chacun des enseignants qui lui sont affectés (même sans réponse).
 export async function evalResults(campaignId, classeId = null) {
   await load()
-  const user = requireUser('pedagogy', 'teacher')
+  const user = requireUser('pedagogy') // résultats réservés à la direction pédagogique
   const c = evalCampaignOf(campaignId)
-  if (user.role === 'teacher' && c.status !== 'fermee') throw new ApiError('Les résultats seront disponibles à la clôture de la campagne.', 'forbidden', 403)
   const questions = evalQuestions(c)
   if (user.role === 'pedagogy' && classeId) {
     const cl = db.classes.find((x) => x.id === Number(classeId))
@@ -2616,18 +2683,11 @@ function evalDashboard(responses, questions) {
   }
 }
 
-// GET /api/teacher/evaluations : campagnes clôturées, avec les résultats de l'enseignant
+// Les enseignants ne voient pas leur évaluation : résultats réservés à la direction pédagogique
 export async function myEvalResults() {
   await load()
-  const user = requireUser('teacher')
-  const closed = (db.evalCampaigns || []).filter((c) => c.status === 'fermee').sort((a, b) => (b.endAt > a.endAt ? 1 : -1))
-  const pending = (db.evalCampaigns || []).filter((c) => c.status === 'ouverte').map((c) => ({ id: c.id, title: c.title, endAt: c.endAt }))
-  const results = []
-  for (const c of closed) {
-    const responses = await platform.store.query('evalResponses', { campaignId: c.id, teacherId: user.id })
-    results.push({ campaign: { id: c.id, title: c.title, periode: db.periodes.find((p) => p.id === c.periodeId)?.name ?? '', closedAt: c.closedAt ?? c.endAt }, rows: evalAggregate(responses, evalQuestions(c)) })
-  }
-  return { minResponses: EVAL_MIN_RESPONSES, pending, results }
+  requireUser('teacher')
+  throw new ApiError('Les résultats de l\'évaluation des enseignants sont réservés à la direction pédagogique.', 'forbidden', 403)
 }
 
 // GET /api/student/evaluations : campagne ouverte, enseignants à évaluer et ceux déjà évalués
@@ -2857,7 +2917,24 @@ export async function absenceOverview() {
   const allowed = user.role === 'teacher' ? new Set(db.teaching.filter((t) => t.teacherId === user.id).map((t) => t.classeId)) : null
   const classes = db.classes.filter((c) => !allowed || allowed.has(c.id)).sort(byLevel)
   const counts = await Promise.all(classes.map((c) => platform.store.count('attendance', { classeId: c.id })))
-  return clone(classes.map((c, i) => ({ id: c.id, name: c.name, level: c.level, students: classStudents(c.id).length, sessions: counts[i] })))
+  const mine = new Set(user.role === 'educator' ? user.supervisedClasseIds || [] : [])
+  return clone(classes.map((c, i) => ({ id: c.id, name: c.name, level: c.level, students: classStudents(c.id).length, sessions: counts[i], mine: mine.has(c.id) })))
+}
+
+// PUT /api/me/classes { classeIds } : l'éducateur choisit les classes qu'il suit
+export async function setSupervisedClasses(classeIds = []) {
+  await load()
+  const user = requireUser('educator')
+  user.supervisedClasseIds = [...new Set(classeIds.map(Number))].filter((id) => db.classes.some((c) => c.id === id))
+  audit(user, 'classes_suivies', `${user.lastName} ${user.firstName}`, user.supervisedClasseIds.map(className).join(', '))
+  save()
+  return { classeIds: user.supervisedClasseIds }
+}
+// Éducateurs qui suivent une classe (à défaut, tous les éducateurs, y compris les enseignants éducateurs)
+const educatorsOf = (classeId) => {
+  const all = db.users.filter((u) => u.active && rolesOf(u).includes('educator'))
+  const mine = all.filter((u) => (u.supervisedClasseIds || []).includes(classeId))
+  return mine.length ? mine : all
 }
 
 // GET /api/absences/class/{id} : heures d'absence de chaque étudiant de la classe
@@ -3053,7 +3130,7 @@ export async function submitJustification(input = {}) {
   }
   await platform.store.put('justifications', id, j)
   // Les éducateurs sont prévenus qu'un billet attend leur vérification
-  for (const u of db.users.filter((x) => x.role === 'educator' && x.active)) {
+  for (const u of educatorsOf(user.classeId)) {
     notify(u.id, 'Justificatif à vérifier', `${user.lastName} ${user.firstName} (${className(user.classeId)}) : ${ids.length} absence(s), ${motif}.`, '/educateur/absences?onglet=justificatifs')
   }
   audit(user, 'depot_justificatif', `${user.lastName} ${user.firstName} (${user.matricule})`, `${ids.length} absence(s) - ${motif}`)

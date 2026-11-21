@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { ArrowLeft, RefreshCw, KeyRound, Timer, CircleCheck, UserRound, BellRing } from 'lucide-react'
 import * as api from '../../api/index.js'
+import { downloadSebConfig } from '../../lib/sebConfig.js'
 import { useToast } from '../../context/ToastContext.jsx'
 import { ErrorBox, Loader, Modal, ResponsiveTable, RiskBadge, Stat, StatusBadge, ICON } from '../../components/ui.jsx'
 import { EVENT_LABELS, fmtAgo, fmtTime, fmtDuration } from '../../lib/format.js'
@@ -41,6 +42,7 @@ export default function ProctorSessionDetail() {
           <StatusBadge status={s.status} />
           {s.status === 'ouverte' && (
             <div>
+              <button type="button" className="btn btn-secondary btn-sm" style={{ marginBottom: 10 }} onClick={downloadSebConfig}>Configuration Safe Exam Browser (.seb)</button>
               <div className="label">Code d'accès</div>
               <div className="row"><span className="session-code">{s.code}</span>
                 <button className="icon-btn" title="Générer un nouveau code" aria-label="Générer un nouveau code" onClick={async () => { await api.regenerateCode(s.id); setData(await api.sessionDetail(id)); toast.info('Nouveau code généré. Les étudiants déjà entrés continuent normalement.') }}><RefreshCw {...ICON} /></button>

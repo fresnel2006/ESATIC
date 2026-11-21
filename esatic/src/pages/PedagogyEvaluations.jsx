@@ -512,7 +512,7 @@ export default function PedagogyEvaluations() {
               {selected.status === 'fermee' && <button className="btn btn-secondary btn-sm" onClick={() => setStatus(selected, 'ouverte')}><LockOpen size={14} /> Rouvrir</button>}
             </div>
           )}
-          {selected && <div className="eval-anon"><ShieldCheck size={16} /> Réponses anonymes : le nom de l'étudiant n'est jamais enregistré avec sa réponse. Personne, ni la direction ni l'enseignant, ne peut savoir qui a voté ; seuls des moyennes et des commentaires s'affichent, à partir de 3 réponses.</div>}
+          {selected && <div className="eval-anon"><ShieldCheck size={16} /> Réponses anonymes : le nom de l'étudiant n'est jamais enregistré avec sa réponse. Personne ne peut savoir qui a voté ; seuls des moyennes et des commentaires s'affichent, à partir de 3 réponses. Les résultats ne sont visibles que par la direction pédagogique : les enseignants ne voient pas leur évaluation.</div>}
           {selected?.status === 'brouillon' ? (
             <div className="card">
               <div className="card-header"><h2>Questions de l'évaluation</h2><span className="small muted">Brouillon : les étudiants voient la section, sans pouvoir cliquer</span></div>

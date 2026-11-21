@@ -245,6 +245,8 @@ export const ACTION_LABELS = {
   creation_evaluation: 'Préparation d\'une évaluation des enseignants',
   depot_emploi_du_temps: 'Dépôt d\'un emploi du temps',
   appel: 'Appel fait',
+  changement_espace: 'Changement d\'espace (enseignant / éducateur)',
+  classes_suivies: 'Classes suivies par l\'éducateur',
   modification_appel: 'Appel corrigé',
   justification_absence: 'Absence justifiée',
   annulation_justification: 'Justification d\'absence retirée',

@@ -256,7 +256,10 @@ async function execute(name, args, ctx, call, ApiError, tx) {
   }
   for (const u of data.users || []) authLoaded.set(u.id, JSON.stringify(AUTH_FIELDS.map((f) => u[f] ?? null)))
 
-  const user = tokenUser ? (data.users || []).find((u) => u.id === tokenUser) ?? null : null
+  const found = tokenUser ? (data.users || []).find((u) => u.id === tokenUser) ?? null : null
+  // Rôle actif (enseignant qui est aussi éducateur) : les données chargées suivent l'espace choisi
+  const activeRole = ctx.tokenIn?.role
+  const user = found && activeRole && activeRole !== found.role && (found.extraRoles || []).includes(activeRole) ? { ...found, role: activeRole } : found
   const scope = (SCOPES[name] || none)(args, user, data)
   const [atts, audit, inbox] = await Promise.all([
     ownAtts ?? loadAttempts(get, scope, user?.id ?? null, data),

@@ -2,6 +2,7 @@ import { Fragment, useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Check, ChevronLeft, ChevronRight, Library, Plus, Save, Send, ListChecks, AlignLeft, Code2, Database, LayoutTemplate, Workflow, FolderPlus, ArrowUp, ArrowDown, Trash2 } from 'lucide-react'
 import * as api from '../../api/index.js'
+import { downloadSebConfig } from '../../lib/sebConfig.js'
 import { useToast } from '../../context/ToastContext.jsx'
 import QuestionEditor, { newQuestion, tempId } from '../../components/QuestionEditor.jsx'
 import Statement from '../../components/Statement.jsx'
@@ -29,7 +30,8 @@ function emptyAssessment() {
     startAt: start.toISOString(), endAt: end.toISOString(), durationMin: 60, maxAttempts: 1,
     languages: [],
     // Plein écran obligatoire par défaut (devoirs comme examens) ; l'enseignant peut le décocher
-    security: { fullscreen: true, blockPaste: true, sebRequired: false, sebKeys: '', shuffleQuestions: false, exitWarnings: null },
+    // Plein écran obligatoire et copie envoyée à la 3e sortie, par défaut ; Safe Exam Browser par défaut pour les examens
+    security: { fullscreen: true, blockPaste: true, sebRequired: false, sebKeys: '', shuffleQuestions: false, exitWarnings: 2 },
     questions: [], status: 'brouillon',
   }
 }
@@ -143,6 +145,10 @@ export default function EpreuveWizard() {
     if (s === 2) {
       const k = sections.findIndex((x) => !x.title.trim())
       if (k >= 0) return `Donnez un titre à l'exercice ${k + 1}.`
+      if (!a.questions.length) return 'Ajoutez au moins une question avant de continuer.'
+      // Pas de passage aux étapes suivantes tant qu'un énoncé est vide
+      const i = a.questions.findIndex((q) => !String(q.statement || '').trim())
+      if (i >= 0) return `Question ${i + 1} : écrivez l'énoncé avant de continuer.`
     }
     if (s === 1) {
       if (!a.startAt || !a.endAt) return 'Indiquez les dates de début et de fin.'
@@ -156,7 +162,14 @@ export default function EpreuveWizard() {
     if (n > step) {
       for (let s = step; s < n; s++) {
         const e = stepError(s)
-        if (e) { setError(e); setStep(s); return }
+        if (e) {
+          setError(e)
+          // Énoncé vide : retour sur la question concernée, curseur dans l'énoncé
+          const empty = s === 2 && a.questions.find((q) => !String(q.statement || '').trim())
+          if (empty) { goToQuestion(empty.id); setError(e); return }
+          setStep(s)
+          return
+        }
       }
     }
     setError('')
@@ -290,7 +303,7 @@ export default function EpreuveWizard() {
                   ['examen', 'Examen surveillé', 'Créneau fixe, chronomètre, code d\'accès donné par le surveillant, règles de sécurité.'],
                 ].map(([k, t, d]) => (
                   <label key={k} className={`choice ${a.kind === k ? 'selected' : ''}`} style={{ alignItems: 'flex-start' }}>
-                    <input type="radio" name="kind" checked={a.kind === k} disabled={isPublished} onChange={() => set({ kind: k, security: { ...a.security, fullscreen: true, exitWarnings: k === 'examen' ? 2 : null } })} />
+                    <input type="radio" name="kind" checked={a.kind === k} disabled={isPublished} onChange={() => set({ kind: k, security: { ...a.security, fullscreen: true, exitWarnings: 2, sebRequired: k === 'examen' } })} />
                     <span><strong>{t}</strong><span className="small muted" style={{ display: 'block' }}>{d}</span></span>
                   </label>
                 ))}
@@ -462,7 +475,13 @@ export default function EpreuveWizard() {
             />
             <Toggle title="Bloquer le copier-coller externe" desc="Copier, couper, coller, glisser-déposer et clic droit sont bloqués. Dans les zones de réponse, l'étudiant peut recoller ce qu'il a lui-même copié." checked={a.security.blockPaste} onChange={(v) => setSec({ blockPaste: v })} />
             <Toggle title="Mélanger l'ordre des questions" desc="Chaque étudiant reçoit les questions dans un ordre différent." checked={a.security.shuffleQuestions} onChange={(v) => setSec({ shuffleQuestions: v })} />
-            <Toggle title="Exiger Safe Exam Browser" desc="La clé du navigateur est vérifiée par le serveur. Réservé aux postes de la salle équipés de SEB." checked={a.security.sebRequired} onChange={(v) => setSec({ sebRequired: v })} disabled={a.kind !== 'examen'} />
+            <Toggle title="Exiger Safe Exam Browser" desc="Activé par défaut pour les examens. SEB verrouille l'ordinateur : impossible de changer d'application (Alt+Tab, gestes du pavé tactile, touche Windows) ou d'ouvrir un autre site. Le serveur refuse l'examen ouvert dans un autre navigateur. SEB doit être installé sur les postes de la salle." checked={a.security.sebRequired} onChange={(v) => setSec({ sebRequired: v })} disabled={a.kind !== 'examen'} />
+            {a.kind === 'examen' && a.security.sebRequired && (
+              <div className="row-wrap" style={{ margin: '6px 0 10px' }}>
+                <button type="button" className="btn btn-secondary btn-sm" onClick={downloadSebConfig}>Télécharger la configuration Safe Exam Browser (.seb)</button>
+                <span className="hint">À ouvrir sur chaque poste de la salle : SEB s'ouvre directement sur la plateforme.</span>
+              </div>
+            )}
             {a.security.sebRequired && (
               <div className="field" style={{ marginTop: 10 }}>
                 <label htmlFor="w-seb">Clés Browser Exam Key autorisées (une par ligne)</label>

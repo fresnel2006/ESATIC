@@ -1,7 +1,7 @@
 import {
   House, Files, CalendarClock, FileBadge, Megaphone,
   FolderKanban, Library, ClipboardCheck, ChartColumn, Users,
-  MonitorPlay, BellRing, History, Star, Award, CalendarDays, UserCheck, UserX,
+  MonitorPlay, BellRing, History, Star, CalendarDays, UserCheck, UserX,
   LayoutDashboard, Network, FileStack, ScrollText, Settings, UserCog,
 } from 'lucide-react'
 
@@ -29,7 +29,6 @@ export const NAV = {
     { to: '/enseignant/resultats', label: 'Résultats', icon: ChartColumn, mobile: true },
     { to: '/enseignant/classes', label: 'Classes', icon: Users },
     { to: '/enseignant/emplois-du-temps', label: 'Emplois du temps', icon: CalendarDays },
-    { to: '/enseignant/evaluations', label: 'Mes évaluations', icon: Award },
   ],
   proctor: [
     { to: '/surveillant/sessions', label: 'Sessions', icon: MonitorPlay, mobile: true },

@@ -7,7 +7,7 @@ import { Modal, Notice, ICON } from '../components/ui.jsx'
 import { DEMO_ACCOUNTS } from '../api/constants.js'
 import { DEMO_TOOLS, TEST_MODE } from '../config.js'
 import * as api from '../api/index.js'
-import { ROLE_HOME } from '../lib/format.js'
+import { ROLE_HOME, ROLE_LABELS } from '../lib/format.js'
 
 // Mode test : entrer dans l'espace enseignant sans mot de passe (TEST_MODE.openTeacher, jamais en ligne)
 function TeacherTestAccess() {
@@ -38,8 +38,35 @@ function TeacherTestAccess() {
   )
 }
 
+// Choix de l'espace après la connexion (compte enseignant qui est aussi éducateur)
+const SPACE = {
+  teacher: ['Espace enseignant', 'Épreuves, corrections, appel en classe, résultats'],
+  educator: ['Espace éducateur', 'Absences de vos classes, justificatifs, bulletins'],
+}
+function RoleChoice({ user, onChoose }) {
+  const [busy, setBusy] = useState('')
+  return (
+    <div className="role-choice-page">
+      <div className="role-choice card">
+        <img src="/img/logo-esatic.svg" alt="ESATIC" className="role-choice-logo" />
+        <h1>Bonjour {user.firstName}</h1>
+        <p className="muted">Votre compte a deux espaces. Dans lequel voulez-vous entrer ?</p>
+        <div className="role-choice-list">
+          {user.roles.map((r) => (
+            <button key={r} className="role-choice-item" disabled={!!busy} onClick={async () => { setBusy(r); try { await onChoose(r) } finally { setBusy('') } }}>
+              <strong>{SPACE[r]?.[0] || ROLE_LABELS[r]}</strong>
+              <span className="small muted">{SPACE[r]?.[1] || ''}</span>
+            </button>
+          ))}
+        </div>
+        <p className="small muted">Vous pourrez changer d'espace à tout moment depuis le menu de votre compte.</p>
+      </div>
+    </div>
+  )
+}
+
 export default function Login() {
-  const { user, login, sessionMessage, clearSessionMessage } = useAuth()
+  const { user, login, switchRole, sessionMessage, clearSessionMessage } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
   const [identifier, setIdentifier] = useState('')
@@ -48,7 +75,17 @@ export default function Login() {
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [forgot, setForgot] = useState(false)
+  const [choosing, setChoosing] = useState(false)
 
+  if (user && choosing && !user.mustChangePassword && user.roles?.length > 1) {
+    return (
+      <RoleChoice user={user} onChoose={async (role) => {
+        const u = role === user.role ? user : await switchRole(role)
+        setChoosing(false)
+        navigate(ROLE_HOME[u.role], { replace: true })
+      }} />
+    )
+  }
   if (user) return <Navigate to={user.mustChangePassword ? '/premiere-connexion' : ROLE_HOME[user.role]} replace />
 
   async function submit(e) {
@@ -61,6 +98,8 @@ export default function Login() {
     setBusy(true)
     try {
       const u = await login(identifier, password)
+      // Enseignant qui est aussi éducateur : il choisit d'abord son espace
+      if (!u.mustChangePassword && u.roles?.length > 1) { setChoosing(true); return }
       const from = location.state?.from
       navigate(u.mustChangePassword ? '/premiere-connexion' : from && from.startsWith(ROLE_HOME[u.role].split('/').slice(0, 2).join('/')) ? from : ROLE_HOME[u.role], { replace: true })
     } catch (err) {
