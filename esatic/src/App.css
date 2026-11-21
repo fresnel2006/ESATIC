@@ -1144,7 +1144,7 @@ h2, h3 { font-weight: 600; }
 
 
 /* Appel (enseignant) */
-.att-form { grid-template-columns: 1.3fr 1.3fr 1fr 1.2fr; }
+.att-form { grid-template-columns: 1fr 1fr 1fr; }
 @media (max-width: 900px) { .att-form { grid-template-columns: 1fr 1fr; } }
 .att-card { overflow: hidden; }
 .att-head { flex-wrap: wrap; gap: 10px; }
@@ -1276,3 +1276,18 @@ h2, h3 { font-weight: 600; }
 .justif-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .justif-refuse { display: flex; gap: 8px; flex: 1; flex-wrap: wrap; }
 .justif-refuse .input { flex: 1; min-width: 240px; }
+
+
+/* Appel : choix du jour (semaine en cours) */
+.att-days { padding: 0 20px 18px; display: flex; flex-direction: column; gap: 8px; }
+.att-days-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 8px; }
+.att-day { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 6px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface, #fff); font: inherit; cursor: pointer; color: var(--text); }
+.att-day b { font-size: 0.78rem; letter-spacing: 0.04em; }
+.att-day span { font-size: 0.86rem; color: var(--text-2); }
+.att-day em { font-style: normal; font-size: 0.7rem; color: var(--primary); font-weight: 600; }
+.att-day:hover:not(:disabled) { border-color: var(--primary); }
+.att-day.on { background: var(--primary); border-color: var(--primary); color: #fff; }
+.att-day.on span, .att-day.on em { color: #fff; }
+.att-day:disabled { opacity: 0.45; cursor: not-allowed; }
+.att-when { font-size: 0.95rem; }
+.att-when b { text-transform: capitalize; }

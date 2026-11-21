@@ -2798,7 +2798,12 @@ export async function attendanceOptions() {
   const classes = [...new Set(rows.map((t) => t.classeId))].map((id) => db.classes.find((c) => c.id === id)).filter(Boolean)
     .sort(byLevel)
     .map((c) => ({ id: c.id, name: c.name, level: c.level, students: classStudents(c.id).length, matieres: rows.filter((t) => t.classeId === c.id).map((t) => ({ id: t.matiereId, name: matiereName(t.matiereId) })) }))
-  return { classes, today: isoDay(), minDate: isoDay(new Date(Date.now() - ATTENDANCE_EDIT_DAYS * 864e5)), editDays: ATTENDANCE_EDIT_DAYS, slots: ATTENDANCE_SLOTS }
+  const today = isoDay()
+  const monday = mondayOf(today)
+  return {
+    classes, today, minDate: isoDay(new Date(Date.now() - ATTENDANCE_EDIT_DAYS * 864e5)), editDays: ATTENDANCE_EDIT_DAYS, slots: ATTENDANCE_SLOTS,
+    week: [0, 1, 2, 3, 4, 5].map((i) => addDays(monday, i)),
+  }
 }
 
 // GET /api/attendance?classe=&date=&creneau= : liste de la classe et appel déjà fait sur ce créneau (s'il existe)
@@ -2845,6 +2850,8 @@ export async function saveAttendance(input = {}) {
   const id = attendanceKey(classeId, date, start)
   const existing = await platform.store.get('attendance', id)
   if (existing && existing.teacherId !== user.id) throw new ApiError(`L'appel de ce créneau a déjà été fait par ${fullName(existing.teacherId)}.`, 'conflict', 409)
+  // L'appel se fait en classe, le jour du cours ; après, seul un appel déjà fait peut être corrigé
+  if (!existing && date !== isoDay()) throw new ApiError(`L'appel se fait en classe, le jour du cours : celui du ${fmtDayFr(date)} n'a pas été fait et ne peut plus l'être. Un appel déjà fait peut seulement être corrigé.`)
   const doc = {
     id, schoolId: user.schoolId ?? 1, classeId, matiereId, teacherId: user.id, date, slot, start, end,
     hours: round2(minutes / 60), records, justified: existing?.justified || {},

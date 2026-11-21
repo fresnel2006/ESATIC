@@ -16,6 +16,9 @@ function currentSlot() {
   return m < 10 * 60 + 10 ? 1 : m < 13 * 60 + 30 ? 2 : 3
 }
 const weekday = (d) => new Date(`${d}T12:00:00Z`).getUTCDay()
+const DAY = ['DIMANCHE', 'LUNDI', 'MARDI', 'MERCREDI', 'JEUDI', 'VENDREDI', 'SAMEDI']
+const ddmm = (d) => `${d.slice(8, 10)}/${d.slice(5, 7)}`
+const longDay = (d) => new Date(`${d}T12:00:00Z`).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
 
 function RollCall({ options, preset, onSaved }) {
   const toast = useToast()
@@ -58,7 +61,11 @@ function RollCall({ options, preset, onSaved }) {
     } catch (e) { setError(e.message) } finally { setBusy(false) }
   }
 
-  const locked = existing && !existing.mine
+  // L'appel se fait en classe, le jour du cours : un autre jour, on ne peut que corriger un appel déjà fait
+  const notToday = f.date !== options.today
+  const locked = (existing && !existing.mine) || (notToday && !existing)
+  const days = options.week.includes(f.date) ? options.week : [...options.week, f.date].sort()
+  const chooseDay = (d) => set({ date: d, slot: weekday(d) === 6 && Number(f.slot) === 3 ? 1 : f.slot })
   return (
     <div className="stack">
       <div className="card">
@@ -75,7 +82,6 @@ function RollCall({ options, preset, onSaved }) {
               {(classe?.matieres || []).map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
             </select>
           </div>
-          <div className="field"><label htmlFor="att-d">Date du cours</label><input id="att-d" type="date" className="input" value={f.date} min={options.minDate} max={options.today} onChange={(e) => set({ date: e.target.value, slot: weekday(e.target.value) === 6 && Number(f.slot) === 3 ? 1 : f.slot })} /></div>
           <div className="field">
             <label htmlFor="att-s">Créneau</label>
             <select id="att-s" className="select" value={f.slot} onChange={(e) => set({ slot: Number(e.target.value) })}>
@@ -83,9 +89,22 @@ function RollCall({ options, preset, onSaved }) {
             </select>
           </div>
         </div>
+        <div className="att-days" role="radiogroup" aria-label="Jour du cours">
+          <span className="label">Jour du cours</span>
+          <div className="att-days-row">
+            {days.map((d) => (
+              <button key={d} type="button" role="radio" aria-checked={f.date === d} disabled={d > options.today}
+                className={`att-day ${f.date === d ? 'on' : ''} ${d === options.today ? 'today' : ''}`} onClick={() => chooseDay(d)}>
+                <b>{DAY[weekday(d)]}</b><span>{ddmm(d)}</span>{d === options.today && <em>Aujourd'hui</em>}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
 
+      <div className="att-when"><b>{longDay(f.date)}</b> · créneau {f.slot} ({hm(options.slots[f.slot][0])} - {hm(options.slots[f.slot][1])}, {Number(f.slot) === 3 ? 'soir' : 'matin'})</div>
       {weekday(f.date) === 0 && <Notice kind="danger">Pas de cours le dimanche : choisissez un autre jour.</Notice>}
+      {notToday && !existing && weekday(f.date) !== 0 && roster && <Notice>L'appel se fait en classe, le jour du cours. Aucun appel n'a été fait pour ce créneau ce jour-là ; vous pouvez seulement corriger un appel déjà fait (voir « Mes appels »).</Notice>}
       {existing && (locked
         ? <Notice kind="danger">L'appel de ce créneau a déjà été fait par {existing.teacher} ({existing.matiere}). Choisissez un autre créneau.</Notice>
         : <Notice>Vous avez déjà fait l'appel de ce cours ({existing.matiere}). Vous pouvez le corriger puis l'enregistrer à nouveau.</Notice>)}
@@ -101,7 +120,7 @@ function RollCall({ options, preset, onSaved }) {
               <span className="att-count absent"><b>{counts.absent}</b> absent{counts.absent > 1 ? 's' : ''}</span>
               <span className="att-count retard"><b>{counts.retard}</b> retard{counts.retard > 1 ? 's' : ''}</span>
             </div>
-            <button className="btn btn-secondary btn-sm" disabled={locked} onClick={() => setRecords(Object.fromEntries(roster.map((s) => [s.id, 'present'])))}><CheckCheck size={15} /> Tous présents</button>
+            <button className="btn btn-secondary btn-sm" disabled={!!locked} onClick={() => setRecords(Object.fromEntries(roster.map((s) => [s.id, 'present'])))}><CheckCheck size={15} /> Tous présents</button>
           </div>
           <div className="att-list">
             {roster.map((s, i) => (
