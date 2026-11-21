@@ -1,7 +1,7 @@
 import {
   House, Files, CalendarClock, FileBadge, Megaphone,
   FolderKanban, Library, ClipboardCheck, ChartColumn, Users,
-  MonitorPlay, BellRing, History, Star, Award, CalendarDays,
+  MonitorPlay, BellRing, History, Star, Award, CalendarDays, UserCheck, UserX,
   LayoutDashboard, Network, FileStack, ScrollText, Settings, UserCog,
 } from 'lucide-react'
 
@@ -15,6 +15,7 @@ export const NAV = {
     { to: '/etudiant/emplois-du-temps', label: 'Emploi du temps', icon: CalendarDays, mobile: true },
     { to: '/etudiant/resultats', label: 'Bulletins', icon: FileBadge, mobile: true },
     { to: '/etudiant/annonces', label: 'Annonces', icon: Megaphone, mobile: true },
+    { to: '/etudiant/absences', label: 'Mes absences', icon: UserX },
     // Visible en permanence, cliquable seulement quand la direction pédagogique a validé une évaluation
     { to: '/etudiant/evaluations', label: 'Évaluer mes enseignants', icon: Star, gate: 'evaluation',
       lockedHint: 'Pas encore disponible : la direction pédagogique doit d\'abord ouvrir l\'évaluation des enseignants.' },
@@ -23,6 +24,7 @@ export const NAV = {
     { to: '/enseignant', label: 'Accueil', icon: House, end: true, mobile: true },
     { to: '/enseignant/epreuves', label: 'Mes épreuves', icon: FolderKanban, mobile: true },
     { to: '/enseignant/banque', label: 'Banque de questions', icon: Library },
+    { to: '/enseignant/appel', label: "Faire l'appel", icon: UserCheck, mobile: true },
     { to: '/enseignant/corrections', label: 'Corrections', icon: ClipboardCheck, mobile: true },
     { to: '/enseignant/resultats', label: 'Résultats', icon: ChartColumn, mobile: true },
     { to: '/enseignant/classes', label: 'Classes', icon: Users },
@@ -38,9 +40,11 @@ export const NAV = {
     { to: '/direction/evaluations', label: 'Évaluation des enseignants', icon: Star, mobile: true },
     { to: '/direction/emplois-du-temps', label: 'Emplois du temps', icon: CalendarDays, mobile: true },
     { to: '/direction/bulletins', label: 'Bulletins', icon: FileBadge, mobile: true },
+    { to: '/direction/absences', label: 'Absences', icon: UserX, mobile: true },
   ],
   educator: [
     { to: '/educateur/bulletins', label: 'Bulletins', icon: FileBadge, mobile: true },
+    { to: '/educateur/absences', label: 'Absences', icon: UserX, mobile: true },
   ],
   admin: [
     { to: '/admin', label: 'Tableau de bord', icon: LayoutDashboard, end: true, mobile: true },
@@ -49,6 +53,7 @@ export const NAV = {
     { to: '/admin/epreuves', label: 'Épreuves', icon: FileStack, mobile: true },
     { to: '/admin/bulletins', label: 'Bulletins', icon: FileBadge },
     { to: '/admin/emplois-du-temps', label: 'Emplois du temps', icon: CalendarDays },
+    { to: '/admin/absences', label: 'Absences', icon: UserX },
     { to: '/admin/journal', label: "Journal d'activité", icon: ScrollText },
     { to: '/admin/parametres', label: 'Paramètres', icon: Settings },
   ],

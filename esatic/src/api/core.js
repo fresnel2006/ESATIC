@@ -51,6 +51,12 @@ const platform = {
     },
     query: async (collection, filters) => Object.values(demoStore()[collection] || {}).filter((d) => Object.entries(filters).every(([f, v]) => d[f] === v)),
     count: async (collection, filters) => Object.values(demoStore()[collection] || {}).filter((d) => Object.entries(filters).every(([f, v]) => d[f] === v)).length,
+    get: async (collection, id) => demoStore()[collection]?.[String(id)] ?? null,
+    put: async (collection, id, data) => {
+      const all = demoStore()
+      ;(all[collection] ||= {})[String(id)] = data
+      localStorage.setItem('esatic-demo-store', JSON.stringify(all))
+    },
   },
 }
 const demoFiles = new Map()
@@ -2732,6 +2738,273 @@ export async function submitEvaluation(campaignId, teacherId, matiereId, scores 
   ])
   if (!ok) throw new ApiError('Vous avez déjà évalué cet enseignant pour cette matière.')
   return { ok: true }
+}
+
+// ---------------------------------------------------------------------------
+// Appel et heures d'absence
+// L'enseignant fait l'appel de chaque cours (classe, matière, date, horaire) : présent, absent ou en retard.
+// Les heures d'absence de chaque étudiant se calculent à partir des appels. Direction pédagogique, éducateurs
+// et administration les consultent par classe et par étudiant et justifient les absences ; l'étudiant voit
+// les siennes. Rangement à part (collection attendance) : un document par cours, identifiant classe_date_heure,
+// pour que des milliers d'appels ne ralentissent pas la plateforme.
+// ---------------------------------------------------------------------------
+
+const ABSENCE_STAFF = ['pedagogy', 'educator', 'admin']
+const ATTENDANCE_STATUSES = ['present', 'absent', 'retard']
+const ATTENDANCE_EDIT_DAYS = 30
+// Créneaux du cahier d'appels de l'ESATIC : 1 = 7 h 30 - 10 h 00, 2 = 10 h 15 - 12 h 45, 3 = 14 h 00 - 16 h 30
+// (du lundi au samedi ; le samedi, seulement le matin)
+export const ATTENDANCE_SLOTS = { 1: ['07:30', '10:00'], 2: ['10:15', '12:45'], 3: ['14:00', '16:30'] }
+const slotOfStart = (start) => Number(Object.keys(ATTENDANCE_SLOTS).find((k) => ATTENDANCE_SLOTS[k][0] === start)) || null
+const weekdayOf = (date) => new Date(`${date}T12:00:00Z`).getUTCDay() // 0 dimanche ... 6 samedi
+// Lundi de la semaine d'une date (AAAA-MM-JJ)
+function mondayOf(date) {
+  const d = new Date(`${date}T12:00:00Z`)
+  d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7))
+  return d.toISOString().slice(0, 10)
+}
+const addDays = (date, n) => { const d = new Date(`${date}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10) }
+const isHhmm = (s) => /^([01]\d|2[0-3]):[0-5]\d$/.test(String(s || ''))
+const minutesOf = (s) => Number(s.slice(0, 2)) * 60 + Number(s.slice(3, 5))
+const isoDay = (d = new Date()) => d.toISOString().slice(0, 10)
+const byName = (a, b) => a.lastName.localeCompare(b.lastName) || a.firstName.localeCompare(b.firstName)
+const classStudents = (classeId) => db.users.filter((u) => u.role === 'student' && u.active && u.classeId === classeId).sort(byName)
+const attendanceKey = (classeId, date, start) => `${classeId}_${date}_${start.replace(':', '')}`
+const className = (id) => db.classes.find((c) => c.id === id)?.name ?? ''
+const fmtDayFr = (d) => new Date(`${d}T12:00:00Z`).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })
+
+function attendanceInfo(a) {
+  const values = Object.values(a.records || {})
+  return {
+    id: a.id, classeId: a.classeId, classe: className(a.classeId), matiereId: a.matiereId, matiere: matiereName(a.matiereId),
+    teacherId: a.teacherId, teacher: fullName(a.teacherId), date: a.date, slot: a.slot || slotOfStart(a.start), start: a.start, end: a.end, hours: a.hours,
+    counts: { present: values.filter((v) => v === 'present').length, absent: values.filter((v) => v === 'absent').length, retard: values.filter((v) => v === 'retard').length },
+    updatedAt: a.updatedAt,
+  }
+}
+const attendanceOrder = (a, b) => (b.date + b.start).localeCompare(a.date + a.start)
+
+// L'enseignant fait l'appel des classes et matières qui lui sont affectées
+function assertTeaches(user, classeId, matiereId = null) {
+  const ok = db.teaching.some((t) => t.teacherId === user.id && t.classeId === classeId && (matiereId === null || t.matiereId === matiereId))
+  if (!ok) throw new ApiError(matiereId === null ? 'Cette classe ne vous est pas affectée.' : 'Cette matière ne vous est pas affectée dans cette classe.', 'forbidden', 403)
+}
+
+// GET /api/attendance/options (enseignant) : ses classes et, pour chacune, ses matières
+export async function attendanceOptions() {
+  await load()
+  const user = requireUser('teacher')
+  const rows = db.teaching.filter((t) => t.teacherId === user.id)
+  const classes = [...new Set(rows.map((t) => t.classeId))].map((id) => db.classes.find((c) => c.id === id)).filter(Boolean)
+    .sort(byLevel)
+    .map((c) => ({ id: c.id, name: c.name, level: c.level, students: classStudents(c.id).length, matieres: rows.filter((t) => t.classeId === c.id).map((t) => ({ id: t.matiereId, name: matiereName(t.matiereId) })) }))
+  return { classes, today: isoDay(), minDate: isoDay(new Date(Date.now() - ATTENDANCE_EDIT_DAYS * 864e5)), editDays: ATTENDANCE_EDIT_DAYS, slots: ATTENDANCE_SLOTS }
+}
+
+// GET /api/attendance?classe=&date=&creneau= : liste de la classe et appel déjà fait sur ce créneau (s'il existe)
+export async function getAttendance(classeId, date, slot) {
+  const start = ATTENDANCE_SLOTS[Number(slot)]?.[0]
+  await load()
+  const user = requireUser('teacher', ...ABSENCE_STAFF)
+  const cid = Number(classeId)
+  if (!db.classes.some((c) => c.id === cid)) throw new ApiError('Classe introuvable.', 'not_found', 404)
+  if (user.role === 'teacher') assertTeaches(user, cid)
+  const doc = isHhmm(start) && /^\d{4}-\d{2}-\d{2}$/.test(String(date)) ? await platform.store.get('attendance', attendanceKey(cid, date, start)) : null
+  return clone({
+    roster: classStudents(cid).map((s, i) => ({ id: s.id, n: i + 1, name: `${s.lastName} ${s.firstName}`, matricule: s.matricule, statut: s.statut || 'N' })),
+    attendance: doc ? { ...attendanceInfo(doc), records: doc.records || {}, mine: doc.teacherId === user.id } : null,
+  })
+}
+
+// POST /api/attendance { classeId, matiereId, date, slot (1, 2, 3), records: { idÉtudiant: 'present' | 'absent' | 'retard' } }
+// Un seul appel par classe et par créneau ; l'enseignant qui l'a fait peut le corriger pendant 30 jours.
+export async function saveAttendance(input = {}) {
+  await load()
+  const user = requireUser('teacher')
+  const classeId = Number(input.classeId)
+  const matiereId = Number(input.matiereId)
+  assertTeaches(user, classeId, matiereId)
+  const date = String(input.date || '')
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(new Date(date).getTime())) throw new ApiError('Choisissez la date du cours.')
+  if (date > isoDay()) throw new ApiError('L\'appel ne peut pas se faire pour un cours à venir.')
+  if (date < isoDay(new Date(Date.now() - ATTENDANCE_EDIT_DAYS * 864e5))) throw new ApiError(`L'appel ne peut plus être fait ou modifié après ${ATTENDANCE_EDIT_DAYS} jours.`)
+  const slot = Number(input.slot)
+  if (!ATTENDANCE_SLOTS[slot]) throw new ApiError('Choisissez le créneau du cours (1, 2 ou 3).')
+  const wd = weekdayOf(date)
+  if (wd === 0) throw new ApiError('Pas de cours le dimanche.')
+  if (wd === 6 && slot === 3) throw new ApiError('Le samedi, les cours ont lieu seulement le matin (créneaux 1 et 2).')
+  const [start, end] = ATTENDANCE_SLOTS[slot]
+  const minutes = minutesOf(end) - minutesOf(start)
+  const roster = classStudents(classeId)
+  if (!roster.length) throw new ApiError('Aucun étudiant dans cette classe.')
+  const records = {}
+  for (const s of roster) {
+    const st = input.records?.[s.id] ?? input.records?.[String(s.id)]
+    records[s.id] = ATTENDANCE_STATUSES.includes(st) ? st : 'present'
+  }
+  const id = attendanceKey(classeId, date, start)
+  const existing = await platform.store.get('attendance', id)
+  if (existing && existing.teacherId !== user.id) throw new ApiError(`L'appel de ce créneau a déjà été fait par ${fullName(existing.teacherId)}.`, 'conflict', 409)
+  const doc = {
+    id, schoolId: user.schoolId ?? 1, classeId, matiereId, teacherId: user.id, date, slot, start, end,
+    hours: round2(minutes / 60), records, justified: existing?.justified || {},
+    createdAt: existing?.createdAt || now(), updatedAt: now(),
+  }
+  await platform.store.put('attendance', id, doc)
+  // Prévenir les étudiants notés absents (pas de nouvelle notification s'ils l'étaient déjà)
+  for (const s of roster) {
+    if (records[s.id] === 'absent' && existing?.records?.[s.id] !== 'absent') {
+      notify(s.id, 'Absence enregistrée', `${matiereName(matiereId)} : ${fmtDayFr(date)}, ${start} - ${end}.`, '/etudiant/absences')
+    }
+  }
+  const info = attendanceInfo(doc)
+  audit(user, existing ? 'modification_appel' : 'appel', `${info.classe} - ${info.matiere}`, `${date} créneau ${slot} (${start}-${end}) : ${info.counts.absent} absent(s), ${info.counts.retard} retard(s)`)
+  return clone(info)
+}
+
+// GET /api/attendance/mine (enseignant) : ses appels, du plus récent au plus ancien
+export async function myAttendanceSessions() {
+  await load()
+  const user = requireUser('teacher')
+  const docs = await platform.store.query('attendance', { teacherId: user.id })
+  return clone(docs.map(attendanceInfo).sort(attendanceOrder).slice(0, 200))
+}
+
+// Totaux d'un étudiant à partir des appels de sa classe
+function absenceTotalsFor(docs, studentId) {
+  const t = { hours: 0, justifiedHours: 0, absences: 0, retards: 0 }
+  for (const d of docs) {
+    const st = d.records?.[studentId]
+    if (st === 'absent') {
+      t.hours += d.hours || 0
+      t.absences += 1
+      if (d.justified?.[studentId]) t.justifiedHours += d.hours || 0
+    } else if (st === 'retard') t.retards += 1
+  }
+  t.hours = round2(t.hours)
+  t.justifiedHours = round2(t.justifiedHours)
+  t.unjustifiedHours = round2(t.hours - t.justifiedHours)
+  return t
+}
+
+// GET /api/absences (direction pédagogique, éducateurs, administration ; enseignant : ses classes) :
+// les classes, avec le nombre d'appels faits
+export async function absenceOverview() {
+  await load()
+  const user = requireUser(...ABSENCE_STAFF, 'teacher')
+  const allowed = user.role === 'teacher' ? new Set(db.teaching.filter((t) => t.teacherId === user.id).map((t) => t.classeId)) : null
+  const classes = db.classes.filter((c) => !allowed || allowed.has(c.id)).sort(byLevel)
+  const counts = await Promise.all(classes.map((c) => platform.store.count('attendance', { classeId: c.id })))
+  return clone(classes.map((c, i) => ({ id: c.id, name: c.name, level: c.level, students: classStudents(c.id).length, sessions: counts[i] })))
+}
+
+// GET /api/absences/class/{id} : heures d'absence de chaque étudiant de la classe
+export async function absenceSummary(classeId) {
+  await load()
+  const user = requireUser(...ABSENCE_STAFF, 'teacher')
+  const cid = Number(classeId)
+  const classe = db.classes.find((c) => c.id === cid)
+  if (!classe) throw new ApiError('Classe introuvable.', 'not_found', 404)
+  if (user.role === 'teacher') assertTeaches(user, cid)
+  const docs = await platform.store.query('attendance', { classeId: cid })
+  const rows = classStudents(cid).map((s) => ({ student: publicUser(s), ...absenceTotalsFor(docs, s.id) }))
+  return clone({
+    classe: { id: classe.id, name: classe.name },
+    sessions: docs.length, courseHours: round2(docs.reduce((n, d) => n + (d.hours || 0), 0)),
+    totalHours: round2(rows.reduce((n, r) => n + r.hours, 0)),
+    rows, canJustify: ABSENCE_STAFF.includes(user.role),
+  })
+}
+
+function absenceItems(docs, studentId) {
+  return docs.filter((d) => ['absent', 'retard'].includes(d.records?.[studentId])).sort(attendanceOrder).map((d) => ({
+    attendanceId: d.id, date: d.date, start: d.start, end: d.end, hours: d.hours, matiere: matiereName(d.matiereId), teacher: fullName(d.teacherId),
+    status: d.records[studentId], justified: !!d.justified?.[studentId], reason: d.justified?.[studentId]?.reason || '',
+  }))
+}
+
+// GET /api/absences/student/{id} : détail des absences et retards d'un étudiant
+export async function studentAbsences(studentId) {
+  await load()
+  const user = requireUser(...ABSENCE_STAFF, 'teacher')
+  const s = db.users.find((u) => u.id === Number(studentId) && u.role === 'student')
+  if (!s) throw new ApiError('Étudiant introuvable.', 'not_found', 404)
+  if (user.role === 'teacher') assertTeaches(user, s.classeId)
+  const docs = await platform.store.query('attendance', { classeId: s.classeId })
+  return clone({ student: publicUser(s), classe: className(s.classeId), totals: absenceTotalsFor(docs, s.id), items: absenceItems(docs, s.id), canJustify: ABSENCE_STAFF.includes(user.role) })
+}
+
+// PUT /api/absences/justify { attendanceId, studentId, justified, reason } (direction pédagogique, éducateurs, administration)
+export async function justifyAbsence(attendanceId, studentId, justified, reason = '') {
+  await load()
+  const actor = requireUser(...ABSENCE_STAFF)
+  const doc = await platform.store.get('attendance', String(attendanceId))
+  const sid = Number(studentId)
+  if (!doc || doc.records?.[sid] !== 'absent') throw new ApiError('Absence introuvable.', 'not_found', 404)
+  doc.justified ||= {}
+  if (justified) doc.justified[sid] = { by: actor.id, at: now(), reason: String(reason || '').trim().slice(0, 200) }
+  else delete doc.justified[sid]
+  doc.updatedAt = now()
+  await platform.store.put('attendance', doc.id, doc)
+  const s = db.users.find((u) => u.id === sid)
+  if (justified) notify(sid, 'Absence justifiée', `${matiereName(doc.matiereId)} du ${fmtDayFr(doc.date)} : votre absence est justifiée.`, '/etudiant/absences')
+  audit(actor, justified ? 'justification_absence' : 'annulation_justification', s ? `${s.lastName} ${s.firstName} (${s.matricule})` : '', `${matiereName(doc.matiereId)} ${doc.date} ${doc.start}-${doc.end}`)
+  return { ok: true }
+}
+
+// GET /api/attendance/week?classe=&semaine= : cahier d'appels d'une classe pour une semaine (lundi au samedi),
+// au format de la feuille papier de l'ESATIC : n° d'ordre, nom, prénoms, statut, et pour chaque jour les
+// créneaux 1 et 2 (matin) et 3 (soir), la matière et l'enseignant de chaque créneau, le visa de l'administration.
+export async function attendanceWeek(classeId, date) {
+  await load()
+  const user = requireUser('teacher', ...ABSENCE_STAFF)
+  const cid = Number(classeId)
+  const classe = db.classes.find((c) => c.id === cid)
+  if (!classe) throw new ApiError('Classe introuvable.', 'not_found', 404)
+  if (user.role === 'teacher') assertTeaches(user, cid)
+  const monday = mondayOf(/^\d{4}-\d{2}-\d{2}$/.test(String(date)) ? date : isoDay())
+  const saturday = addDays(monday, 5)
+  const docs = (await platform.store.query('attendance', { classeId: cid })).filter((d) => d.date >= monday && d.date <= saturday)
+  const roster = classStudents(cid)
+  const days = [0, 1, 2, 3, 4, 5].map((i) => {
+    const day = addDays(monday, i)
+    const slots = (i === 5 ? [1, 2] : [1, 2, 3]).map((slot) => {
+      const d = docs.find((x) => x.date === day && (x.slot || slotOfStart(x.start)) === slot)
+      return { slot, done: !!d, matiere: d ? matiereName(d.matiereId) : '', teacher: d ? fullName(d.teacherId) : '', records: d ? d.records : {}, justified: d ? Object.keys(d.justified || {}) : [] }
+    })
+    return { date: day, slots }
+  })
+  const visa = await platform.store.get('attendanceVisa', `${cid}_${monday}`)
+  const filiere = db.filieres.find((f) => f.id === classe.filiereId)
+  return clone({
+    classe: { id: classe.id, name: classe.name, level: classe.level, filiere: filiere?.name || filiere?.code || '' },
+    monday, saturday, previous: addDays(monday, -7), next: addDays(monday, 7),
+    roster: roster.map((s, i) => ({ id: s.id, n: i + 1, lastName: s.lastName, firstName: s.firstName, statut: s.statut || 'N' })),
+    days, slots: ATTENDANCE_SLOTS,
+    visa: visa?.by ? { by: fullName(visa.by), at: visa.at } : null,
+    canVisa: ABSENCE_STAFF.includes(user.role),
+  })
+}
+
+// PUT /api/attendance/week/visa { classeId, semaine, visa } : visa de l'administration sur la feuille de la semaine
+export async function visaAttendanceWeek(classeId, date, value = true) {
+  await load()
+  const actor = requireUser(...ABSENCE_STAFF)
+  const cid = Number(classeId)
+  const classe = db.classes.find((c) => c.id === cid)
+  if (!classe) throw new ApiError('Classe introuvable.', 'not_found', 404)
+  const monday = mondayOf(String(date))
+  await platform.store.put('attendanceVisa', `${cid}_${monday}`, value ? { classeId: cid, monday, by: actor.id, at: now() } : { classeId: cid, monday, by: null, at: null, removed: true })
+  audit(actor, value ? 'visa_cahier_appels' : 'retrait_visa_cahier_appels', classe.name, `Semaine du ${monday}`)
+  return { ok: true }
+}
+
+// GET /api/student/absences : ses propres absences et retards
+export async function myAbsences() {
+  await load()
+  const user = requireUser('student')
+  const docs = await platform.store.query('attendance', { classeId: user.classeId })
+  return clone({ totals: absenceTotalsFor(docs, user.id), items: absenceItems(docs, user.id) })
 }
 
 // Remise à zéro de la démo (bouton dans les paramètres)

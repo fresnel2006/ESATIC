@@ -168,6 +168,7 @@ const READ_FIRST = new Set([
   'listAnnouncements', 'search', 'bulletinOptions', 'listBulletins', 'getBulletinFile', 'studentBulletins',
   'listEvalCampaigns', 'evalResults', 'myEvalResults', 'studentEvaluations', 'submitEvaluation', 'evalAvailable',
   'studentHome', 'listTimetables', 'myTimetables', 'getTimetableFile',
+  'attendanceOptions', 'getAttendance', 'myAttendanceSessions', 'absenceOverview', 'absenceSummary', 'studentAbsences', 'myAbsences', 'attendanceWeek',
 ])
 
 const chunks = (list, n = 30) => Array.from({ length: Math.ceil(list.length / n) }, (_, i) => list.slice(i * n, i * n + n))
@@ -496,6 +497,14 @@ export async function storeQuery(collection, filters) {
 }
 export async function storeCount(collection, filters) {
   return (await where(collection, filters).count().get()).data().count
+}
+// Un document (appel d'un cours) : lecture, écriture complète (remplace l'ancien contenu)
+export async function storeGet(collection, id) {
+  const snap = await firestore.collection(collection).doc(String(id)).get()
+  return snap.exists ? snap.data() : null
+}
+export async function storePut(collection, id, data) {
+  await firestore.collection(collection).doc(String(id)).set(data)
 }
 
 // Ajoute des notifications dans les boîtes de leurs destinataires (ajout atomique, sans transaction)

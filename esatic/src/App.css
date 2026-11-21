@@ -1141,3 +1141,98 @@ h2, h3 { font-weight: 600; }
 .td-compare { font-size: 0.8rem; color: var(--text-3); text-align: right; white-space: nowrap; }
 .teacher-detail .stat .k { white-space: normal; }
 @media (max-width: 640px) { .td-score { align-items: flex-start; } .td-note { grid-template-columns: 1fr; gap: 2px; } .td-compare { text-align: left; } }
+
+
+/* Appel (enseignant) */
+.att-form { grid-template-columns: 1.3fr 1.3fr 1fr 1.2fr; }
+@media (max-width: 900px) { .att-form { grid-template-columns: 1fr 1fr; } }
+.att-card { overflow: hidden; }
+.att-head { flex-wrap: wrap; gap: 10px; }
+.att-counts { display: flex; gap: 8px; flex-wrap: wrap; }
+.att-count { padding: 4px 12px; border-radius: 999px; font-size: 0.86rem; background: var(--surface-2); }
+.att-count.present { background: #e3f4ea; color: #146c3a; }
+.att-count.absent { background: #fde8e6; color: #b3261e; }
+.att-count.retard { background: #fff3dc; color: #8a5a00; }
+.att-list { display: flex; flex-direction: column; }
+.att-row { display: flex; align-items: center; gap: 12px; padding: 10px 18px; border-bottom: 1px solid var(--border); border-left: 3px solid transparent; transition: background .15s; }
+.att-row.absent { background: #fff6f5; border-left-color: #d93025; }
+.att-row.retard { background: #fffaf0; border-left-color: #e0a100; }
+.att-num { width: 22px; text-align: right; color: var(--text-3); font-size: 0.82rem; }
+.att-name { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.att-seg { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; flex-shrink: 0; }
+.att-btn { border: 0; background: var(--surface, #fff); padding: 7px 14px; font: inherit; font-size: 0.88rem; cursor: pointer; color: var(--text-2); border-right: 1px solid var(--border); }
+.att-btn:last-child { border-right: 0; }
+.att-btn:disabled { cursor: not-allowed; opacity: 0.6; }
+.att-btn.present.on { background: #1e8e4e; color: #fff; }
+.att-btn.absent.on { background: #d93025; color: #fff; }
+.att-btn.retard.on { background: #e0a100; color: #fff; }
+.att-foot { position: sticky; bottom: 0; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 12px 18px; background: var(--surface, #fff); border-top: 1px solid var(--border); }
+@media (max-width: 640px) { .att-row { flex-wrap: wrap; } .att-seg { width: 100%; } .att-btn { flex: 1; } }
+
+/* Absences */
+.abs-picker { display: flex; align-items: center; gap: 12px; max-width: 520px; }
+.abs-picker .select { flex: 1; }
+.abs-hours { display: inline-block; padding: 3px 10px; border-radius: 999px; font-weight: 700; font-size: 0.86rem; font-variant-numeric: tabular-nums; }
+.abs-hours.none { background: var(--surface-2); color: var(--text-3); }
+.abs-hours.low { background: #fff3dc; color: #8a5a00; }
+.abs-hours.mid { background: #fde3d0; color: #a14a00; }
+.abs-hours.high { background: #fde8e6; color: #b3261e; }
+.abs-red { color: #b3261e; font-weight: 600; }
+.abs-list { display: flex; flex-direction: column; }
+.abs-item { display: grid; grid-template-columns: 210px minmax(0, 1fr) auto auto; align-items: center; gap: 14px; padding: 12px 20px; border-bottom: 1px solid var(--border); border-left: 3px solid #d93025; }
+.abs-item:last-child { border-bottom: 0; }
+.abs-item.retard { border-left-color: #e0a100; }
+.abs-item.is-justified { border-left-color: #1e8e4e; }
+.abs-when, .abs-what { display: flex; flex-direction: column; min-width: 0; }
+.abs-tag { font-size: 0.78rem; font-weight: 600; padding: 2px 9px; border-radius: 999px; white-space: nowrap; }
+.abs-tag.absent { background: #fde8e6; color: #b3261e; }
+.abs-tag.retard { background: #fff3dc; color: #8a5a00; }
+.abs-tag.justified { background: #e3f4ea; color: #146c3a; }
+.abs-justify { grid-column: 1 / -1; display: flex; gap: 8px; flex-wrap: wrap; }
+.abs-justify .input { flex: 1; min-width: 220px; }
+@media (max-width: 760px) { .abs-item { grid-template-columns: 1fr auto; } .abs-what { grid-column: 1 / -1; } }
+
+
+/* Cahier d'appels (format de la feuille papier de l'ESATIC) */
+.sheet-tools { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.sheet { padding: 18px; }
+.sheet-head { display: grid; grid-template-columns: auto 1fr auto; gap: 18px; align-items: center; padding-bottom: 12px; margin-bottom: 12px; border-bottom: 2px solid #1b1b1b; }
+.sheet-logo { height: 44px; width: auto; }
+.sheet-title { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.sheet-title strong { font-size: 1.15rem; letter-spacing: 0.06em; }
+.sheet-meta { display: flex; flex-direction: column; gap: 2px; font-size: 0.82rem; text-align: right; }
+.sheet-scroll { overflow-x: auto; }
+.sheet-table { border-collapse: collapse; width: 100%; font-size: 0.78rem; color: #1b1b1b; background: #fff; }
+.sheet-table th, .sheet-table td { border: 1px solid #555; padding: 3px 4px; text-align: center; }
+.sheet-table th { background: #f2f4f7; font-weight: 700; }
+.sheet-table .c-day span { display: block; font-weight: 400; font-size: 0.7rem; color: #555; }
+.sheet-table .c-half { font-size: 0.68rem; }
+.sheet-table .c-slot { font-size: 0.7rem; width: 30px; }
+.sheet-table .c-nom, .sheet-table .c-prenom { text-align: left; white-space: nowrap; }
+.sheet-table td.c-nom { font-weight: 600; }
+.sheet-table .c-n { width: 28px; }
+.sheet-table .c-sta { width: 34px; }
+.sheet-table .c-cell { height: 24px; min-width: 30px; }
+.sheet-table .c-cell.done { background: #fbfcfe; }
+.sheet-table tbody tr:nth-child(even) td { background-color: #fafafa; }
+.sheet-abs { font-weight: 800; color: #1d3fbf; font-family: 'Segoe Print', 'Comic Sans MS', cursive; font-size: 0.85rem; }
+.sheet-abs.just { color: #1e8e4e; }
+.sheet-ret { font-weight: 800; color: #b06a00; }
+.sheet-dot { color: #777; font-weight: 700; }
+.sheet-table .c-label { text-align: left; font-weight: 600; font-size: 0.75rem; }
+.sheet-table .c-sign { vertical-align: top; height: 70px; font-size: 0.62rem; }
+.sheet-table .c-sign span { display: flex; flex-direction: column; gap: 2px; writing-mode: vertical-rl; transform: rotate(180deg); margin: 0 auto; max-height: 120px; }
+.sheet-table .c-visa { text-align: left; }
+.sheet-stamp { display: inline-flex; align-items: center; gap: 6px; color: #1d3fbf; font-weight: 600; border: 2px solid #1d3fbf; padding: 3px 10px; transform: rotate(-2deg); }
+.sheet-notes { margin-top: 10px; font-size: 0.74rem; color: #333; display: flex; flex-direction: column; gap: 3px; }
+.sheet-notes p { margin: 0; }
+
+@media print {
+  @page { size: A4 landscape; margin: 8mm; }
+  body * { visibility: hidden !important; }
+  .print-area, .print-area * { visibility: visible !important; }
+  .print-area { position: absolute; left: 0; top: 0; width: 100%; border: 0 !important; box-shadow: none !important; padding: 0 !important; }
+  .sheet-scroll { overflow: visible; }
+  .sheet-table { font-size: 9px; }
+  .no-print { display: none !important; }
+}

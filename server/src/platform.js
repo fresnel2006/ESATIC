@@ -4,7 +4,7 @@ import { AsyncLocalStorage } from 'node:async_hooks'
 import { scrypt } from 'node:crypto'
 import { promisify } from 'node:util'
 import * as core from '../../esatic/src/api/core.js'
-import { serverId, putFile, getFile, storeCreateAll, storeQuery, storeCount } from './data.js'
+import { serverId, putFile, getFile, storeCreateAll, storeQuery, storeCount, storeGet, storePut } from './data.js'
 
 const scryptAsync = promisify(scrypt)
 const pepper = process.env.PASSWORD_PEPPER
@@ -39,7 +39,7 @@ core.configurePlatform({
     remove: (key) => { ctx()?.removeFiles?.add(key) },
   },
   // Évaluation des enseignants : participations et réponses anonymes, rangées à part
-  store: { createAll: storeCreateAll, query: storeQuery, count: storeCount },
+  store: { createAll: storeCreateAll, query: storeQuery, count: storeCount, get: storeGet, put: storePut },
   getToken: () => ctx()?.token ?? null,
   setToken: (t) => { const c = ctx(); if (c) { c.token = t; c.out = t } },
   clearToken: () => { const c = ctx(); if (c) { c.token = null; c.out = null } },
